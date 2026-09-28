@@ -116,6 +116,10 @@ export interface DraftMeta {
   forced: boolean;
   forcedReason?: string;
   model: string;
+  /** Stage-2 inclusion threshold that admitted the keep-list. Null on force-through / empty-stop / unfiltered. */
+  includeThreshold: number | null;
+  keptFiles: number;
+  droppedFiles: number;
   at: string;
 }
 

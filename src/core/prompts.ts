@@ -11,6 +11,16 @@ export const IS_SIGNIFICANT_CRITERIA = {
   false: "Formatting-only, lockfile-only, typo-only, WIP, or generated noise, anything that doesn't or isn't worth publically publishing about",
 } as const;
 
+/* ---------------- per-file inclusion filter (Jev Noul, one call, many questions) ---------------- */
+
+/** Shared question text for every per-file inclusion judgment (file rides in instructions). */
+export const IS_INCLUDE_INSTRUCTIONS = "Is this file's change worth including as context for drafting a public post about the commit?";
+
+export const IS_INCLUDE_CRITERIA = {
+  true: "User-visible feature, bug fix with user impact, performance win, or noteworthy change worth describing in public",
+  false: "Formatting-only, typo-only, lockfile-only, generated noise, or internal scaffolding with no user-visible meaning",
+} as const;
+
 /* ---------------- platform writer system prompts ---------------- */
 
 export const X_SYSTEM_PROMPT = [
@@ -45,11 +55,12 @@ export const BLOG_FORMAT_NOTES = "Markdown with # title. Links as [text](url).";
 
 /* ---------------- generation directives ---------------- */
 
-/** Search directive: every draft browses first. Folded into all prompts. */
+/** Search directive: agent-decided browsing. Folded into all prompts. */
 export const SEARCH_INSTRUCTION = [
   "",
-  "Before writing, you must call browser_search to find 1-2 current, relevant references",
-  "(recent discussions, docs, or trends related to this change) and weave the best one in naturally.",
+  "Call browser_search only if a current external reference would add value",
+  "(public API, library, pattern, or trend behind this change). Otherwise write",
+  "directly from the context. Max 1-2 searches, and weave the best result in naturally.",
 ].join("\n");
 
 /** How the writer must treat reference examples. */
@@ -61,12 +72,11 @@ export const REFERENCE_INSTRUCTION = [
 
 /* ---------------- preference summarizer ---------------- */
 
-/** System prompt for the preference agent: old draft vs author's edit. */
+/** System prompt for the accept-path rule distiller: old draft vs author's edit. */
 export const PREFERENCE_SYSTEM = [
-  "You study how an author edited an AI-generated draft.",
-  "Produce two outputs: (1) what concretely changed and what the author noticeably",
-  "prefers that the old draft missed (brevity, structure, tone, openings, closings);",
-  "(2) ONE reusable style rule for future drafts on this platform — voice, structure,",
-  "rhythm, or length only. Never any facts, names, numbers, dates, or commit specifics;",
-  "empty when nothing generalizes.",
+  "You study how an author edited an AI-generated draft you wrote.",
+  "Emit ONE reusable style rule for future drafts on this platform — voice, structure,",
+  "rhythm, or length only. 50 words or less, plain text, no markdown.",
+  "Never any facts, names, numbers, dates, file paths, or commit specifics.",
+  "Empty string when nothing generalizes.",
 ].join("\n");

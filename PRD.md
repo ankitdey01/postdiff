@@ -69,7 +69,7 @@ Solo/indie developers building in public with an existing or growing social pres
 - Input: committed diff + commit context + README (where available) + paired voice profile (`voice.md` + platform file) + target platform
 - One platform per request via `tract generate [<sha>] [--force] [--blog|--x|--linkedin]` — no fan-out; each platform drafted separately on demand
 - Provider: Groq (BYOK key in `.env`) behind our own `Generator` interface, implemented with the Vercel AI SDK (`ai` + `@ai-sdk/groq`; model pinned in `config.json`). Single-stage: code-assembled prompt carries the full raw context — no prompt-builder model call.
-- Web enrichment: Groq browser search attached on every draft (no flag, no extra key — billed as tokens on the same key). gpt-oss-only; changing `genModel` off gpt-oss silently drops search.
+- Web enrichment: Groq browser search attached as an agent-decided tool (no flag, no extra key — billed as tokens on the same key). The prompt permits 0-2 searches; the model skips browsing when the context alone suffices. gpt-oss-only; changing `genModel` off gpt-oss silently drops search.
 - Blog format includes a configurable target word count; blog output is Markdown (links as `[text](url)`)
 
 ### 7.5 Review

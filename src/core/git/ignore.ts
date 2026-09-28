@@ -60,6 +60,42 @@ function sectionPaths(header: string): string[] {
 }
 
 /**
+ * One per-file chunk of a (shaped) unified diff, split on `diff --git` headers.
+ * `ignored` mirrors the shaping rule: noise sections stay filename-only and
+ * must skip semantic judging — there is nothing to judge in a placeholder.
+ */
+export interface DiffSection {
+  path: string;
+  section: string;
+  ignored: boolean;
+}
+
+export function splitDiffSections(shapedDiff: string): DiffSection[] {
+  const lines = shapedDiff.split("\n");
+  const sections: DiffSection[] = [];
+  let current: string[] | null = null;
+  let path = "(preamble)";
+  let ignoredSection = false;
+  const flush = () => {
+    if (current !== null) sections.push({ path, section: current.join("\n"), ignored: ignoredSection });
+  };
+  for (const line of lines) {
+    if (line.startsWith("diff --git ")) {
+      flush();
+      const paths = sectionPaths(line);
+      path = paths[paths.length - 1] ?? paths[0] ?? "unknown";
+      ignoredSection = paths.some((p) => ignored(p));
+      current = [line];
+      continue;
+    }
+    if (current === null) current = [];
+    current.push(line);
+  }
+  flush();
+  return sections.filter((s) => s.section.trim().length > 0);
+}
+
+/**
  * Collapses ignored files in a unified diff to a one-line placeholder.
  * Returns the shaped diff plus the list of collapsed paths.
  */

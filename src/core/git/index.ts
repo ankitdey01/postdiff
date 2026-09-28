@@ -3,7 +3,8 @@
 import { execFile } from "node:child_process";
 import { shapeDiffForJudge } from "./ignore.js";
 
-export { IGNORED_DIR_PREFIXES, IGNORED_FILES, IGNORED_SUFFIXES, isIgnoredPath, shapeDiffForJudge } from "./ignore.js";
+export { IGNORED_DIR_PREFIXES, IGNORED_FILES, IGNORED_SUFFIXES, isIgnoredPath, shapeDiffForJudge, splitDiffSections } from "./ignore.js";
+export type { DiffSection } from "./ignore.js";
 
 const MAX_DIFF_CHARS = 30_000;
 

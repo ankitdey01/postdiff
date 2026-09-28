@@ -40,7 +40,6 @@ export function assemblePrompt(
   voiceDefault: string,
   voicePlatform: string,
   reference: string,
-  preferences: string[],
   globalPreferences: string[]
 ): AssembledPrompt {
   const spec = platformSpec(platform);
@@ -66,9 +65,6 @@ export function assemblePrompt(
     "",
     "Changed files:",
     renderFiles(context),
-    "",
-    "Learned preferences (from the author's past edits on this commit — apply these):",
-    preferences.length > 0 ? preferences.map((p, i) => `${i + 1}. ${p}`).join("\n") : "(none yet)",
     "",
     "Platform taste rules (learned across all commits — always apply):",
     globalPreferences.length > 0 ? globalPreferences.map((p, i) => `${i + 1}. ${p}`).join("\n") : "(none yet)",

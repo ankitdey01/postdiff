@@ -23,6 +23,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@ai-sdk/devtools": "^1.0.24",
     "@ai-sdk/groq": "^4.0.46",
     "@typesafe-ai/sdk": "latest",
     "ai": "^7.0.107",

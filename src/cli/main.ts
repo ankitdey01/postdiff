@@ -8,16 +8,15 @@ import { fileURLToPath } from "node:url";
 import { ensureTractHome } from "../index.js";
 import { runProgram } from "./router.js";
 
-/** Loads known keys from cwd/.env if not already set. */
+/** Loads known keys from cwd/.env if not already set. No early return: each key is independent. */
 async function loadEnvFile(cwd: string): Promise<void> {
-  if (process.env["TYPESAFE_API_KEY"] && process.env["GROQ_KEY"]) return;
   let raw: string;
   try {
     raw = await readFile(join(cwd, ".env"), "utf8");
   } catch {
     return;
   }
-  for (const key of ["TYPESAFE_API_KEY", "GROQ_KEY"]) {
+  for (const key of ["TYPESAFE_API_KEY", "GROQ_KEY", "TRACT_DEVTOOLS"]) {
     if (process.env[key]) continue;
     const m = raw.match(new RegExp(`^\\s*(?:export\\s+)?${key}\\s*=\\s*["']?([^"'\\r\\n]+)["']?\\s*$`, "m"));
     if (m) process.env[key] = m[1].trim();

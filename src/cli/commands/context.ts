@@ -17,7 +17,9 @@ async function run(ctx: CommandContext): Promise<void> {
   console.log(`commit ${c.sha.slice(0, 8)} (${source})`);
   console.log(`message: ${firstLine(c.commitMessage)}`);
   console.log(`previous: ${c.previousSha === null ? "(none — root commit)" : `${c.previousSha.slice(0, 8)} — ${firstLine(c.previousCommitMessage)}`}`);
-  console.log(`diff: ${c.shapedDiff.length} chars${c.diffTruncated ? " (truncated)" : ""} | files: ${c.files.length} | content: ${c.totalContentChars} chars`);
+  const shown = c.filteredShapedDiff ?? c.shapedDiff;
+  const which = c.filteredShapedDiff ? `filtered (from ${c.shapedDiff.length} shaped)` : "shaped (unfiltered — run generate first)";
+  console.log(`diff: ${shown.length} chars ${which}${c.diffTruncated ? " (truncated)" : ""} | files: ${c.files.length} | content: ${c.totalContentChars} chars`);
   for (const f of c.files) {
     const detail = f.included
       ? `${f.chars} chars${f.truncated ? " (truncated)" : ""}`

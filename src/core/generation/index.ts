@@ -1,7 +1,7 @@
 // Engine: draft generation. Own thin interface; Vercel AI SDK + Groq underneath.
 // Secrets (apiKey) passed in, never read here. Single-stage: full context in.
 
-import { generateText, Output } from "ai";
+import { generateText, Output, streamText, type Telemetry } from "ai";
 import { z } from "zod";
 import { createGroq, groq, type GroqLanguageModelChatOptions } from "@ai-sdk/groq";
 import type { CommitContext } from "../context/index.js";
@@ -16,8 +16,6 @@ export interface GenerateInput {
   voiceDefault: string;
   voicePlatform: string;
   reference: string;
-  /** Learned preference summaries from this commit's review history. */
-  preferences: string[];
   /** Platform taste rules learned across commits (~/.tract/preferences/). */
   globalPreferences: string[];
 }
@@ -41,74 +39,115 @@ export interface DraftResult {
 
 export interface Generator {
   generate(input: GenerateInput): Promise<DraftResult>;
+  /**
+   * Same as generate, but each text delta is pushed to onChunk as it arrives
+   * so the caller (CLI) can display it live. Engine stays UI-agnostic: it
+   * never writes to stdout itself. Files are still the caller's job, after.
+   */
+  generateStream(input: GenerateInput, onChunk: (chunk: string) => void): Promise<DraftResult>;
   /** Raw single-shot text call (no tools): small jobs. */
   complete(system: string, prompt: string): Promise<string>;
   /**
-   * Dual-output edit summary: commit-episodic preference + platform-global rule.
-   * Structured so the two land in different stores; degrades to commit-only
-   * when the model can't do schema (globalRule "").
+   * Accept-path rule distiller: one style-only rule for the global
+   * preferences file, 50 words / 300 chars max. Empty when nothing generalizes.
    */
-  summarizePreference(oldContent: string, newContent: string): Promise<PreferencePair>;
+  summarizeAccept(oldContent: string, newContent: string): Promise<string>;
 }
 
-export interface PreferencePair {
-  /** What makes THIS text good (goes on the new review version). */
-  commitPreference: string;
-  /** Style-only rule for all future drafts (goes to preferences/<platform>.md). Empty when nothing generalizes. */
-  globalRule: string;
+/** Cap for a distilled global rule: 50 words, 300 chars, whichever binds first. */
+export const MAX_RULE_WORDS = 50;
+export const MAX_RULE_CHARS = 300;
+
+/** First-50-words-then-300-chars truncation, so over-long returns never bloat the file. */
+export function truncateRule(rule: string): string {
+  const words = rule.trim().split(/\s+/).filter(Boolean).slice(0, MAX_RULE_WORDS).join(" ");
+  return words.slice(0, MAX_RULE_CHARS).trim();
 }
 
-const PreferencePairSchema = z.object({
-  commitPreference: z.string().describe("What concretely changed and what the author noticeably prefers that the old draft missed. 150 words or less, plain text."),
-  globalRule: z
+const AcceptRuleSchema = z.object({
+  rule: z
     .string()
-    .describe("ONE reusable style rule for this platform learned from the edit (voice, structure, rhythm, length). No facts, names, numbers, or commit specifics. Empty string when nothing generalizes."),
+    .max(MAX_RULE_CHARS)
+    .describe("ONE reusable style rule for this platform learned from the edit (voice, structure, rhythm, length). 50 words or less, plain text, no markdown. No facts, names, numbers, or commit specifics. Empty string when nothing generalizes."),
 });
+
+export interface GeneratorOptions {
+  /** Per-call telemetry integrations (e.g. DevTools capture). Empty/undefined = off. */
+  telemetry?: Telemetry[];
+}
 
 export class GroqGenerator implements Generator {
   constructor(
     private readonly apiKey: string,
-    private readonly model: string
+    private readonly model: string,
+    private readonly opts: GeneratorOptions = {}
   ) {}
 
+  /** Per-call telemetry passthrough. Undefined = SDK default (off unless globally registered). */
+  private telemetryFor(functionId: string): { functionId: string; integrations: Telemetry[] } | undefined {
+    if (!this.opts.telemetry || this.opts.telemetry.length === 0) return undefined;
+    return { functionId, integrations: this.opts.telemetry };
+  }
+
   async generate(input: GenerateInput): Promise<DraftResult> {
+    return this.generateStream(input, () => {});
+  }
+
+  async generateStream(input: GenerateInput, onChunk: (chunk: string) => void): Promise<DraftResult> {
     const provider = this.apiKey ? createGroq({ apiKey: this.apiKey }) : groq;
-    const { system, prompt } = assemblePrompt(input.platform, input.context, input.voiceDefault, input.voicePlatform, input.reference, input.preferences, input.globalPreferences);
+    const { system, prompt } = assemblePrompt(input.platform, input.context, input.voiceDefault, input.voicePlatform, input.reference, input.globalPreferences);
     const started = Date.now();
     // Note: no toolChoice — browser_search is provider-executed, so the model
     // never emits an SDK-visible tool call; `required` would always throw.
-    const result = await generateText({
+    // textStream yields deltas live; the promise-likes below resolve once the
+    // stream is fully consumed.
+    const result = streamText({
       model: provider(this.model),
       system,
       prompt,
       tools: { browser_search: groq.tools.browserSearch({}) },
+      telemetry: this.telemetryFor(`generate-${input.platform}`),
       // Browse sessions bill as input tokens (observed 600k+ on high effort).
       // Low effort keeps search useful without torching the daily quota.
       providerOptions: {
         groq: { reasoningEffort: "medium" } satisfies GroqLanguageModelChatOptions,
       },
     });
+    for await (const delta of result.textStream) onChunk(delta);
+    const [text, usage, finishReason, rawFinishReason, warnings, steps] = await Promise.all([
+      result.text,
+      result.usage,
+      result.finishReason,
+      result.rawFinishReason,
+      result.warnings,
+      result.steps,
+    ]);
     return {
       platform: input.platform,
-      body: result.text.trim(),
+      body: text.trim(),
       model: this.model,
       ms: Date.now() - started,
-      inputTokens: result.usage?.inputTokens ?? null,
-      outputTokens: result.usage?.outputTokens ?? null,
-      finishReason: result.finishReason,
-      rawFinishReason: result.rawFinishReason ?? null,
-      steps: result.steps.length,
-      warnings: result.warnings ?? [],
+      inputTokens: usage?.inputTokens ?? null,
+      outputTokens: usage?.outputTokens ?? null,
+      finishReason,
+      rawFinishReason: rawFinishReason ?? null,
+      steps: steps.length,
+      warnings: warnings ?? [],
     };
   }
 
   async complete(system: string, prompt: string): Promise<string> {
     const provider = this.apiKey ? createGroq({ apiKey: this.apiKey }) : groq;
-    const result = await generateText({ model: provider(this.model), system, prompt });
+    const result = await generateText({
+      model: provider(this.model),
+      system,
+      prompt,
+      telemetry: this.telemetryFor("complete"),
+    });
     return result.text.trim();
   }
 
-  async summarizePreference(oldContent: string, newContent: string): Promise<PreferencePair> {
+  async summarizeAccept(oldContent: string, newContent: string): Promise<string> {
     const provider = this.apiKey ? createGroq({ apiKey: this.apiKey }) : groq;
     const system = PREFERENCE_SYSTEM;
     const prompt = ["OLD DRAFT (what the model wrote):", oldContent, "", "NEW DRAFT (the author's edited version):", newContent].join("\n");
@@ -117,16 +156,14 @@ export class GroqGenerator implements Generator {
         model: provider(this.model),
         system,
         prompt,
-        output: Output.object({ schema: PreferencePairSchema }),
+        output: Output.object({ schema: AcceptRuleSchema }),
+        telemetry: this.telemetryFor("summarize-accept"),
       });
-      return {
-        commitPreference: result.output.commitPreference.trim().slice(0, 1000),
-        globalRule: result.output.globalRule.trim().slice(0, 500),
-      };
+      return truncateRule(result.output.rule);
     } catch {
-      // Schema path unsupported — degrade to a single commit preference, no global rule.
+      // Schema path unsupported — degrade to raw text, truncated the same way.
       const fallback = await this.complete(system, prompt);
-      return { commitPreference: fallback.slice(0, 1000), globalRule: "" };
+      return truncateRule(fallback);
     }
   }
 }

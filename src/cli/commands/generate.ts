@@ -4,13 +4,16 @@ import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import {
   JevSignificanceJudge,
+  JevInclusionJudge,
   judgeSignificance,
+  filterShapedDiff,
   getRepoSlug,
   hashDiff,
   loadConfig,
   saveMeta,
   gatherCommitContext,
   loadOrGatherCommitContext,
+  saveCommitContext,
   readVoiceFile,
   getTractHome,
   GroqGenerator,
@@ -25,7 +28,7 @@ import {
 } from "../../index.js";
 import type { CommandContext, TractCommand } from "../router.js";
 import type { Platform } from "../../index.js";
-import { selectedFlags } from "../helpers.js";
+import { selectedFlags, isDevtoolsEnabled, loadDevtoolsTelemetry, devtoolsHint } from "../helpers.js";
 
 function requestedPlatform(ctx: CommandContext): Platform | null {
   const want = selectedFlags(ctx.opts, ["blog", "x", "linkedin"]);
@@ -64,21 +67,21 @@ async function run(ctx: CommandContext): Promise<void> {
     { threshold: config.threshold, force, judge: jevKey ? new JevSignificanceJudge(jevKey, config.jevModel) : undefined }
   );
   const slug = await getRepoSlug(ctx.cwd);
-  const dir = await saveMeta(
-    slug,
-    context.sha,
-    {
-      sha: context.sha,
-      diffHash: hashDiff(context.shapedDiff),
-      noul: result.noul,
-      threshold: result.threshold,
-      verdict: result.verdict,
-      forced: result.forced,
-      forcedReason: result.forcedReason,
-      model: config.jevModel,
-      at: new Date().toISOString(),
-    }
-  );
+  const baseMeta = {
+    sha: context.sha,
+    diffHash: hashDiff(context.shapedDiff),
+    noul: result.noul,
+    threshold: result.threshold,
+    verdict: result.verdict,
+    forced: result.forced,
+    forcedReason: result.forcedReason,
+    model: config.jevModel,
+    includeThreshold: null as number | null,
+    keptFiles: 0,
+    droppedFiles: 0,
+    at: new Date().toISOString(),
+  };
+  const dir = await saveMeta(slug, context.sha, baseMeta);
   if (result.forced && result.forcedReason && !force) console.warn(`warning: ${result.forcedReason}`);
   if (force) console.log("(--force: Jev gate bypassed)");
   console.log(
@@ -113,19 +116,56 @@ async function run(ctx: CommandContext): Promise<void> {
     readReviewState(dir, platform),
     readPreferenceFile(join(home, "preferences"), platformPreferenceFile(platform)),
   ]);
-  const preferences = (prevReview?.versions ?? []).map((v) => v.preference).filter((p): p is string => !!p);
-  if (preferences.length > 0) console.log(`applying ${preferences.length} learned preference(s) from prior review.`);
   const globalPreferences = splitPreferenceRules(globalRulesRaw);
   if (globalPreferences.length > 0) console.log(`applying ${globalPreferences.length} platform taste rule(s).`);
-  const draft = await new GroqGenerator(groqKey, config.genModel).generate({
-    platform,
-    context,
-    voiceDefault,
-    voicePlatform,
-    reference: await readReferenceFile(join(home, "reference"), platformReferenceFile(platform)),
-    preferences,
-    globalPreferences,
-  });
+  // Stage 2: per-file inclusion filter — one Jev call on its own default
+  // ladder (independent of the stage-1 threshold). Groq sees only the kept
+  // sections; a cached filteredShapedDiff skips the call entirely.
+  let genDiff = context.shapedDiff;
+  if (context.filteredShapedDiff !== null) {
+    genDiff = context.filteredShapedDiff;
+    console.log(`filter: cached (${genDiff.length} chars)`);
+  } else if (jevKey) {
+    const inclusion = await filterShapedDiff(context.shapedDiff, {
+      judge: new JevInclusionJudge(jevKey, config.jevModel),
+    });
+    if (inclusion.forcedReason) console.warn(`warning: ${inclusion.forcedReason}`);
+    if (!inclusion.filtered.trim()) {
+      await saveMeta(slug, context.sha, { ...baseMeta, keptFiles: 0, droppedFiles: inclusion.droppedFiles, at: new Date().toISOString() });
+      console.log(`no file scored >= 0.1 — nothing worth including, skipping ${context.sha.slice(0, 8)}.`);
+      process.exitCode = 2;
+      return;
+    }
+    genDiff = inclusion.filtered;
+    console.log(`filter: kept ${inclusion.keptFiles}/${inclusion.keptFiles + inclusion.droppedFiles} files (threshold=${inclusion.thresholdUsed})`);
+    // A forced-through full diff is not a filter result — never cache it as one.
+    if (!inclusion.forcedReason) {
+      await saveCommitContext(home, slug, { ...context, filteredShapedDiff: inclusion.filtered });
+    }
+    await saveMeta(
+      slug,
+      context.sha,
+      { ...baseMeta, includeThreshold: inclusion.thresholdUsed, keptFiles: inclusion.keptFiles, droppedFiles: inclusion.droppedFiles, at: new Date().toISOString() }
+    );
+  } else {
+    console.log("(no TYPESAFE_API_KEY — skipping per-file filter, full diff to generation)");
+  }
+  const genContext = { ...context, shapedDiff: genDiff };
+  const devtools = isDevtoolsEnabled(ctx.opts);
+  const telemetry = await loadDevtoolsTelemetry(devtools);
+  console.log(`drafting ${platform} (streaming) —`);
+  const draft = await new GroqGenerator(groqKey, config.genModel, { telemetry }).generateStream(
+    {
+      platform,
+      context: genContext,
+      voiceDefault,
+      voicePlatform,
+      reference: await readReferenceFile(join(home, "reference"), platformReferenceFile(platform)),
+      globalPreferences,
+    },
+    (chunk) => process.stdout.write(chunk)
+  );
+  process.stdout.write("\n");
   const draftPath = join(dir, platformDraftFile(platform));
   const genPayload = {
     platform,
@@ -156,11 +196,12 @@ async function run(ctx: CommandContext): Promise<void> {
     writeFile(join(dir, `gen-${platform}.json`), JSON.stringify(genPayload, null, 2) + "\n", "utf8"),
   ]);
   console.log(`draft (${draft.model}, ${(draft.ms / 1000).toFixed(1)}s): ${draftPath}`);
+  if (devtools) console.log(devtoolsHint());
   // Fresh lineage: v1 snapshot + pending verdict. A previous verdict is dead —
   // say so loudly instead of letting stale approval linger.
   await initReview(dir, platform, draftText);
-  if (prevReview && prevReview.status !== "pending") {
-    console.log(`previous review (${prevReview.status}) superseded — new draft needs review.`);
+  if (prevReview && prevReview.versions.some((v) => v.status !== "pending")) {
+    console.log(`previous review (${prevReview.versions[prevReview.versions.length - 1]?.status}) superseded — new draft needs review.`);
   }
 }
 
@@ -173,6 +214,7 @@ export const command: TractCommand = {
     { flags: "--blog", description: "draft the blog post" },
     { flags: "--x", description: "draft the X post" },
     { flags: "--linkedin", description: "draft the LinkedIn post" },
+    { flags: "--devtools", description: "capture this run for AI SDK DevTools (local .devtools/, never committed)" },
   ],
   run,
 };

@@ -1,5 +1,6 @@
 // `tract review` — display a stored draft and record accept/reject.
-// Verdicts bind to content hashes: changed text snapshots a new version first.
+// Accept-only learning: accept-with-edit distills one global rule (LLM);
+// reject templates a rule from --reason (no LLM), then removes the version.
 
 import {
   getTractHome,
@@ -10,11 +11,12 @@ import {
   readReviewState,
   initReview,
   recordVerdict,
+  hashContent,
   appendPreferenceRule,
   MAX_PREFERENCE_RULES,
 } from "../../index.js";
 import { join } from "node:path";
-import { resolveDraftDir, readDraft, selectedFlags } from "../helpers.js";
+import { resolveDraftDir, readDraft, selectedFlags, isDevtoolsEnabled, loadDevtoolsTelemetry, devtoolsHint } from "../helpers.js";
 import type { CommandContext, TractCommand } from "../router.js";
 import type { Platform } from "../../index.js";
 
@@ -58,38 +60,71 @@ async function run(ctx: CommandContext): Promise<void> {
   if (!state) state = await initReview(dir, platform, draftBody);
 
   if (!accept && !reject) {
-    console.log(`--- ${platformDraftFile(platform)} @ ${sha.slice(0, 8)} [${state.status}] ---`);
+    const latest = state.versions[state.versions.length - 1];
+    console.log(`--- ${platformDraftFile(platform)} @ ${sha.slice(0, 8)} [${latest?.status ?? "pending"}] ---`);
     console.log(draftBody.trimEnd() || "(empty)");
-    console.log(`--- versions: ${state.versions.length}, decided: ${state.decidedAt ?? "never"} ---`);
-    if (state.reason) console.log(`reason: ${state.reason}`);
+    console.log(`--- versions: ${state.versions.length}, decided: ${latest?.decidedAt ?? "never"} ---`);
     for (const [i, v] of state.versions.entries()) {
-      if (v.preference) console.log(`v${i + 1} preference: ${v.preference}`);
+      console.log(`v${i + 1} [${v.status}]${v.reason ? ` reason: ${v.reason}` : ""}`);
     }
     return;
   }
 
   const reasonArg = ctx.opts["reason"];
   const reason = typeof reasonArg === "string" ? reasonArg : undefined;
+  if (reject) {
+    // No LLM here: reason templates a rule, then the version is dropped.
+    const outcome = await recordVerdict({ dir, platform, fileContent: draftBody, accept: false, reason });
+    if (outcome.kind === "accepted") return; // Unreachable: accept:false never yields accepted.
+    if (outcome.kind === "rejected-kept") {
+      console.log(`rejected ${platformDraftFile(platform)} (accepted version kept — edit abandoned)`);
+    } else {
+      console.log(`rejected ${platformDraftFile(platform)}${outcome.fileDeleted ? " (version removed, no versions left)" : " (version removed)"}`);
+    }
+    if (outcome.globalRule) {
+      const home = getTractHome();
+      const res = await appendPreferenceRule(join(home, "preferences"), platformPreferenceFile(platform), outcome.globalRule);
+      console.log(
+        res === "appended"
+          ? `platform rule saved to preferences/${platformPreferenceFile(platform)}`
+          : res === "appended-rotated"
+            ? `platform rule saved (oldest rule rotated out at cap ${MAX_PREFERENCE_RULES})`
+            : `platform rule already known — skipped`
+      );
+    }
+    return;
+  }
+
+  // Accept path: the LLM fires only when the on-disk text moved, so the key
+  // is required only then.
+  const latest = state.versions[state.versions.length - 1];
+  const moved = latest ? hashContent(draftBody) !== latest.hash : true;
   const groqKey = process.env["GROQ_KEY"] ?? "";
-  // The preference call only fires on changed text; still needs a key then.
+  if (moved && !groqKey) {
+    console.error("Missing GROQ_KEY. Add it to .env so the accept rule can be distilled (or revert your edit first).");
+    process.exitCode = 1;
+    return;
+  }
   const config = await loadConfig();
-  const { state: next, preferenceAdded, globalRule } = await recordVerdict({
+  const devtools = isDevtoolsEnabled(ctx.opts);
+  const telemetry = await loadDevtoolsTelemetry(devtools);
+  const outcome = await recordVerdict({
     dir,
     platform,
     fileContent: draftBody,
-    accept,
+    accept: true,
     reason,
-    summarizer: new GroqGenerator(groqKey, config.genModel),
+    summarizer: new GroqGenerator(groqKey, config.genModel, { telemetry }),
   });
-  console.log(
-    accept
-      ? `accepted ${platformDraftFile(platform)}${preferenceAdded ? " (text had changed — snapshotted + preference noted)" : ""}`
-      : `rejected ${platformDraftFile(platform)}${preferenceAdded ? " (text had changed — snapshotted + preference noted)" : ""}`
-  );
-  if (next.reason) console.log(`reason: ${next.reason}`);
-  if (globalRule) {
+  if (outcome.kind !== "accepted") return;
+  if (devtools && outcome.snapshot) console.log(devtoolsHint());
+  console.log(`accepted ${platformDraftFile(platform)}${outcome.snapshot ? " (text had changed — snapshotted + rule distilled)" : ""}`);
+  if (outcome.state.versions[outcome.state.versions.length - 1]?.reason) {
+    console.log(`reason: ${outcome.state.versions[outcome.state.versions.length - 1]?.reason}`);
+  }
+  if (outcome.globalRule) {
     const home = getTractHome();
-    const res = await appendPreferenceRule(join(home, "preferences"), platformPreferenceFile(platform), globalRule);
+    const res = await appendPreferenceRule(join(home, "preferences"), platformPreferenceFile(platform), outcome.globalRule);
     console.log(
       res === "appended"
         ? `platform rule saved to preferences/${platformPreferenceFile(platform)}`
@@ -110,7 +145,8 @@ export const command: TractCommand = {
     { flags: "--linkedin", description: "review the LinkedIn draft" },
     { flags: "--accept", description: "accept the current text" },
     { flags: "--reject", description: "reject the current text" },
-    { flags: "--reason <text>", description: "why (required on reject, optional on accept)" },
+    { flags: "--reason <text>", description: "why (accept: stored on version; reject: builds the rule)" },
+    { flags: "--devtools", description: "capture the accept-rule call for AI SDK DevTools (local .devtools/)" },
   ],
   run,
 };

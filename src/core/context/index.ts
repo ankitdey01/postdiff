@@ -37,6 +37,11 @@ export interface CommitContext {
   filesChanged: string[];
   /** Shaped + truncated unified diff (ignored contents collapsed). */
   shapedDiff: string;
+  /**
+   * Stage-2 Jev-filtered diff: kept sections only. Null until the first
+   * `generate` for this sha judges it; generation consumes this when present.
+   */
+  filteredShapedDiff: string | null;
   diffTruncated: boolean;
   files: ContextFile[];
   totalContentChars: number;
@@ -125,6 +130,7 @@ export async function gatherCommitContext(cwd: string, shaOrHead: string = "HEAD
     previousCommitMessage: parent.message === null ? null : cleanText(parent.message),
     filesChanged: payload.filesChanged,
     shapedDiff: payload.diff,
+    filteredShapedDiff: null,
     diffTruncated: payload.truncated,
     files,
     totalContentChars: total,
@@ -132,7 +138,7 @@ export async function gatherCommitContext(cwd: string, shaOrHead: string = "HEAD
 }
 
 /** Schema tag on cached context: bump when gather output can change shape. */
-export const CONTEXT_SCHEMA = 1;
+export const CONTEXT_SCHEMA = 2;
 
 interface CachedContext {
   schema: number;
