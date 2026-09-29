@@ -25,7 +25,7 @@ export interface GenerateInput {
   voiceDefault: string;
   voicePlatform: string;
   reference: string;
-  /** Platform taste rules learned across commits (~/.tract/preferences/). */
+  /** Platform taste rules learned across commits (~/.postdiff/preferences/). */
   globalPreferences: string[];
 }
 
