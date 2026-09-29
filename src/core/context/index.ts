@@ -1,6 +1,6 @@
 // Engine: commit context gathering + cleaning. No LLM here — output is the
 // ready-to-serve input for the generation slice (and for Jev debugging).
-// Saved per slug/sha under ~/.tract and reused: same sha => same context.
+// Saved per slug/sha under ~/.postdiff and reused: same sha => same context.
 
 import { join } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
