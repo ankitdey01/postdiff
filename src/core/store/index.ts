@@ -1,4 +1,4 @@
-// Engine: global ~/.tract store. No repo-local .tract (locked Q7).
+// Engine: global ~/.postdiff store. No repo-local .postdiff (locked Q7).
 
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -23,7 +23,7 @@ export const DEFAULT_CONFIG: TractConfig = {
 };
 
 export function getTractHome(): string {
-  return join(homedir(), ".tract");
+  return join(homedir(), ".postdiff");
 }
 
 function writeDefaultConfig(path: string): Promise<void> {
