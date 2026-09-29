@@ -1,4 +1,4 @@
-# Tract
+# Postdiff
 
 Turns your git commits into ready-to-post content — blog, X, LinkedIn (YouTube script deferred to post-v1) — in your own voice.
 
@@ -21,7 +21,7 @@ flowchart LR
             GEN["Generation\n(prompt + external LLM, provider TBD)"]
             VOICE["Voice Profile"]
             FEEDBACK["Feedback Store\nedit deltas / accept-reject"]
-            STORE[("Global Store ~/.tract\nvoice + drafts per repo/commit")]
+            STORE[("Global Store ~/.postdiff\nvoice + drafts per repo/commit")]
         end
     end
 
