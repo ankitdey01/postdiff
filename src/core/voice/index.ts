@@ -1,4 +1,4 @@
-// Voice profile files (global ~/.tract/voice/). V1: static files only; learning is V2.
+// Voice profile files (global ~/.postdiff/voice/). V1: static files only; learning is V2.
 // fs logic lives in ../samplefile; this module preserves the public voice API.
 
 import {
