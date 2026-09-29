@@ -27,10 +27,8 @@ flowchart LR
 
     LLM["External LLM API\n(provider TBD)"]
 
-    subgraph PUBLISH["Browser / Platforms"]
-        XURL["X — intent URL\n(true one-click, prefilled)"]
-        LI["LinkedIn — copy + open\n(manual paste)"]
-        MED["Medium — copy + open\n(manual paste)"]
+    subgraph PUBLISH["Publish (copy-only)"]
+        COPY["Clipboard — copy approved draft\n(user pastes anywhere)"]
     end
 
     GITREPO --> GITMOD
@@ -48,9 +46,7 @@ flowchart LR
     FEEDBACK --> STORE
     VOICE --> STORE
 
-    CLIENTS --> XURL
-    CLIENTS --> LI
-    CLIENTS --> MED
+    CLIENTS --> COPY
 ```
 
 See `PRD.md` for full context.

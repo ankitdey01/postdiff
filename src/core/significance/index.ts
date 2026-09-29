@@ -70,11 +70,15 @@ export class JevSignificanceJudge implements SignificanceJudge {
 const JUDGE_TIMEOUT_MS = 30_000;
 
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`Jev request timed out after ${ms}ms`)), ms);
   });
-  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function judgeSignificance(
@@ -111,6 +115,12 @@ export interface InclusionJudge {
   judgeFiles(sections: { path: string; diff: string }[]): Promise<Record<number, number>>;
 }
 
+interface InclusionQuestion {
+  type: "noul";
+  instructions: { file: { path: string; diff: string }; question: string };
+  criteria: { true: string; false: string };
+}
+
 /** Live Jev inclusion judge: ONE systemOne call, one Noul question per file section. */
 export class JevInclusionJudge implements InclusionJudge {
   constructor(
@@ -123,7 +133,7 @@ export class JevInclusionJudge implements InclusionJudge {
     const out: Record<number, number> = {};
     for (let c = 0; c < sections.length; c += MAX_INCLUDE_QUESTIONS_PER_CALL) {
       const chunk = sections.slice(c, c + MAX_INCLUDE_QUESTIONS_PER_CALL);
-      const questions: Record<string, { type: "noul"; instructions: { file: { path: string; diff: string }; question: string }; criteria: { true: string; false: string } }> = {};
+      const questions: Record<string, InclusionQuestion> = {};
       chunk.forEach((s, k) => {
         const text = s.diff.length > MAX_INCLUDE_SECTION_CHARS ? s.diff.slice(0, MAX_INCLUDE_SECTION_CHARS) + "\n... [section cut: judge budget]" : s.diff;
         questions[`include_file_${c + k}`] = {
@@ -189,7 +199,7 @@ export async function filterShapedDiff(
   }
   if (!opts.judge) throw new Error("No inclusion judge provided (set TYPESAFE_API_KEY to filter, or send the full diff)");
 
-  let nouls = new Map<number, number | null>();
+  const nouls = new Map<number, number | null>();
   try {
     const raw = await withTimeout(
       opts.judge.judgeFiles(judgeable.map((s) => ({ path: s.path, diff: s.section }))),

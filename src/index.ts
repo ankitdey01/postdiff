@@ -1,8 +1,7 @@
 // Public engine surface — the ONLY import surface for cli/extension.
 // Never deep-import core/* from outside; add new slices here as they land.
 
-export { resolveSha, getCommitPayload, truncateDiff, shapeDiffForJudge, splitDiffSections, MAX_BLOB_BYTES } from "./core/git/index.js";
-export { getFileStatuses, getParentMessage, readFileAtCommit, isIgnoredPath } from "./core/git/index.js";
+export { resolveSha, getCommitPayload, truncateDiff, shapeDiffForJudge, splitDiffSections, MAX_BLOB_BYTES, getFileStatuses, getParentMessage, readFileAtCommit, isIgnoredPath } from "./core/git/index.js";
 export type { FileStatus, DiffSection } from "./core/git/index.js";
 export { JevSignificanceJudge, judgeSignificance, JevInclusionJudge, filterShapedDiff } from "./core/significance/index.js";
 export type { SignificanceInput, SignificanceResult, SignificanceJudge, InclusionJudge, FileInclusion, FilteredDiff } from "./core/significance/index.js";
@@ -53,8 +52,8 @@ export {
 export { gatherCommitContext, loadOrGatherCommitContext, saveCommitContext, loadCommitContext } from "./core/context/index.js";
 export { cleanText, MAX_FILE_CHARS, MAX_TOTAL_CHARS, CONTEXT_SCHEMA } from "./core/context/index.js";
 export type { CommitContext, ContextFile, OmitReason } from "./core/context/index.js";
-export { GroqGenerator, platformDraftFile, MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule } from "./core/generation/index.js";
-export type { GenerateInput, DraftResult, Generator, GeneratorOptions } from "./core/generation/index.js";
+export { GroqGenerator, platformDraftFile, MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule, generatePipeline } from "./core/generation/index.js";
+export type { GenerateInput, DraftResult, Generator, GeneratorOptions, PipelineInput, PipelineEvent, PipelineResult } from "./core/generation/index.js";
 export {
   readReviewState,
   initReview,
@@ -64,6 +63,8 @@ export {
   rejectRuleFor,
 } from "./core/review/index.js";
 export type { ReviewStatus, ReviewVersion, ReviewState, VerdictInput, VerdictOutcome } from "./core/review/index.js";
+export { preparePublish } from "./core/publish/index.js";
+export type { PublishReady } from "./core/publish/index.js";
 export { assemblePrompt } from "./core/generation/assemble.js";
 export { platformSpec, X_SPEC, LINKEDIN_SPEC, BLOG_SPEC } from "./core/generation/platforms.js";
 export type { PlatformSpec } from "./core/generation/platforms.js";

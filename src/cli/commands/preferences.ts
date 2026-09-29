@@ -14,7 +14,7 @@ import {
 } from "../../index.js";
 import type { CommandContext, TractCommand } from "../router.js";
 import type { PreferenceFile } from "../../index.js";
-import { selectedFlags } from "../helpers.js";
+import { singleFlag } from "../helpers.js";
 
 function preferencesDir(): string {
   return join(getTractHome(), "preferences");
@@ -22,14 +22,14 @@ function preferencesDir(): string {
 
 /** Reads --blog/--x/--linkedin (commander rejects anything else). */
 function platformFromOpts(ctx: CommandContext): PreferenceFile | null {
-  const pick = selectedFlags(ctx.opts, ["blog", "x", "linkedin"]);
-  if (pick.length === 0) return null;
-  if (pick.length > 1) {
-    console.error(`One file at a time — pass one of --blog, --x, --linkedin (got ${pick.map((p) => `--${p}`).join(", ")}).`);
-    process.exitCode = 1;
-    return null;
-  }
-  return resolvePreferenceFile(`--${pick[0]}`);
+  const pick = singleFlag(ctx.opts, ["blog", "x", "linkedin"]);
+  if (!pick) return null;
+  return resolvePreferenceFile(`--${pick}`);
+}
+
+async function showFile(dir: string, file: PreferenceFile): Promise<void> {
+  console.log(`--- ${file} ---`);
+  console.log((await readPreferenceFile(dir, file)) || "(empty)");
 }
 
 async function run(ctx: CommandContext): Promise<void> {
@@ -41,13 +41,11 @@ async function run(ctx: CommandContext): Promise<void> {
     const file = platformFromOpts(ctx);
     if (process.exitCode === 1) return;
     if (file) {
-      console.log(`--- ${file} ---`);
-      console.log((await readPreferenceFile(dir, file)) || "(empty)");
+      await showFile(dir, file);
       return;
     }
     for (const f of PREFERENCE_FILES) {
-      console.log(`--- ${f} ---`);
-      console.log((await readPreferenceFile(dir, f)) || "(empty)");
+      await showFile(dir, f);
     }
     return;
   }
@@ -68,13 +66,13 @@ async function run(ctx: CommandContext): Promise<void> {
     const rule = ctx.positional.slice(1).join(" ");
     if (sub === "add") {
       const res = await appendPreferenceRule(dir, file, rule);
-      console.log(
-        res === "appended"
-          ? `appended to ${file}`
-          : res === "appended-rotated"
-            ? `appended to ${file} (oldest rule rotated out at cap)`
-            : `already in ${file} — skipped`
-      );
+      if (res === "appended") {
+        console.log(`appended to ${file}`);
+      } else if (res === "appended-rotated") {
+        console.log(`appended to ${file} (oldest rule rotated out at cap)`);
+      } else {
+        console.log(`already in ${file} — skipped`);
+      }
       return;
     }
     await overwritePreferenceFile(dir, file, rule);

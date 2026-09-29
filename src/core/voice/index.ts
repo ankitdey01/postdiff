@@ -16,19 +16,16 @@ export const VOICE_FILES = ["voice.md", "x.md", "linkedin.md", "blog.md"] as con
 export type VoiceFile = (typeof VOICE_FILES)[number];
 
 /** CLI platform flag -> voice file. */
+const VOICE_FLAG_MAP: Record<string, VoiceFile> = {
+  "--blog": "blog.md",
+  "--x": "x.md",
+  "--linkedin": "linkedin.md",
+  "--voice": "voice.md",
+};
+
 export function resolveVoiceFile(flag: string | undefined): VoiceFile | null {
-  switch (flag) {
-    case "--blog":
-      return "blog.md";
-    case "--x":
-      return "x.md";
-    case "--linkedin":
-      return "linkedin.md";
-    case "--voice":
-      return "voice.md";
-    default:
-      return null;
-  }
+  if (!flag) return null;
+  return VOICE_FLAG_MAP[flag] ?? null;
 }
 
 /** Pre-creates the 4 voice files (empty) so `remove` can clear and `view` can read. */

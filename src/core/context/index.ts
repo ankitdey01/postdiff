@@ -12,6 +12,8 @@ import { getRepoSlug, getTractHome } from "../store/index.js";
 export const MAX_FILE_CHARS = 12_000;
 /** Total content budget across files; rest are omitted with a reason. */
 export const MAX_TOTAL_CHARS = 60_000;
+/** Max concurrent git reads while gathering file contents. */
+const FETCH_BATCH_SIZE = 8;
 
 export type OmitReason = "ignored" | "deleted" | "binary" | "budget";
 
@@ -70,7 +72,6 @@ export async function gatherCommitContext(cwd: string, shaOrHead: string = "HEAD
 
   // Phase 1: fetch file contents in bounded-parallel batches (8 git procs max).
   // Budget accounting stays sequential below so output is deterministic.
-  const BATCH_SIZE = 8;
   const raws: Array<string | null | "ignored" | "too-large"> = new Array(statuses.length);
   const toFetch: number[] = [];
   statuses.forEach(({ path, status }, i) => {
@@ -78,8 +79,8 @@ export async function gatherCommitContext(cwd: string, shaOrHead: string = "HEAD
     else if (status === "D") raws[i] = null;
     else toFetch.push(i);
   });
-  for (let b = 0; b < toFetch.length; b += BATCH_SIZE) {
-    const batch = toFetch.slice(b, b + BATCH_SIZE);
+  for (let b = 0; b < toFetch.length; b += FETCH_BATCH_SIZE) {
+    const batch = toFetch.slice(b, b + FETCH_BATCH_SIZE);
     const results = await Promise.all(batch.map((i) => readFileAtCommit(cwd, payload.sha, statuses[i].path)));
     batch.forEach((idx, k) => {
       raws[idx] = results[k] ?? null;

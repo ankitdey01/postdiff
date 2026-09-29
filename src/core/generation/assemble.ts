@@ -15,23 +15,29 @@ export interface AssembledPrompt {
 export const MAX_PROMPT_CONTENT_CHARS = 8_000;
 
 function renderFiles(c: CommitContext, budget: number = MAX_PROMPT_CONTENT_CHARS): string {
+  const parts: string[] = [];
   let spent = 0;
-  return c.files
-    .map((f) => {
-      const label = f.previousPath ? `${f.status} ${f.previousPath} -> ${f.path}` : `${f.status} ${f.path}`;
-      if (!f.included) return `- ${label} (content omitted: ${f.omittedReason})`;
-      const remaining = budget - spent;
-      if (remaining <= 0) return `- ${label} (content omitted: budget)`;
-      let content = f.content ?? "";
-      let note = `${f.chars} chars${f.truncated ? ", truncated" : ""}`;
-      if (content.length > remaining) {
-        content = content.slice(0, remaining) + "\n... [content cut: prompt budget]";
-        note = "cut: prompt budget";
-      }
-      spent += content.length;
-      return `- ${label} (${note}):\n${content}`;
-    })
-    .join("\n\n");
+  for (const f of c.files) {
+    const label = f.previousPath ? `${f.status} ${f.previousPath} -> ${f.path}` : `${f.status} ${f.path}`;
+    if (!f.included) {
+      parts.push(`- ${label} (content omitted: ${f.omittedReason})`);
+      continue;
+    }
+    const remaining = budget - spent;
+    if (remaining <= 0) {
+      parts.push(`- ${label} (content omitted: budget)`);
+      continue;
+    }
+    let content = f.content ?? "";
+    let note = `${f.chars} chars${f.truncated ? ", truncated" : ""}`;
+    if (content.length > remaining) {
+      content = content.slice(0, remaining) + "\n... [content cut: prompt budget]";
+      note = "cut: prompt budget";
+    }
+    spent += content.length;
+    parts.push(`- ${label} (${note}):\n${content}`);
+  }
+  return parts.join("\n\n");
 }
 
 export function assemblePrompt(

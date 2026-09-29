@@ -22,17 +22,13 @@ export const IGNORED_FILES: readonly string[] = [
 /** Suffixes collapsed regardless of directory (build artifacts). */
 export const IGNORED_SUFFIXES: readonly string[] = [".map", ".lock"];
 
-function ignored(path: string): boolean {
+/** True when a repo-relative path is noise: content collapses, filename stays. */
+export function isIgnoredPath(path: string): boolean {
   const p = path.replace(/^\.\//, "");
   if (IGNORED_FILES.includes(p.split("/").pop() ?? "")) return true;
   if (IGNORED_SUFFIXES.some((s) => p.endsWith(s))) return true;
   if (p === ".env" || p.startsWith(".env.")) return true;
   return IGNORED_DIR_PREFIXES.some((d) => p === d.slice(0, -1) || p.startsWith(d));
-}
-
-/** True when a repo-relative path is noise: content collapses, filename stays. */
-export function isIgnoredPath(path: string): boolean {
-  return ignored(path);
 }
 
 function unquoteGitPath(p: string): string {
@@ -84,7 +80,7 @@ export function splitDiffSections(shapedDiff: string): DiffSection[] {
       flush();
       const paths = sectionPaths(line);
       path = paths[paths.length - 1] ?? paths[0] ?? "unknown";
-      ignoredSection = paths.some((p) => ignored(p));
+      ignoredSection = paths.some((p) => isIgnoredPath(p));
       current = [line];
       continue;
     }
@@ -108,7 +104,7 @@ export function shapeDiffForJudge(rawDiff: string): { diff: string; collapsed: s
   for (const line of lines) {
     if (line.startsWith("diff --git ")) {
       const paths = sectionPaths(line);
-      const ignoredHits = paths.filter((p) => ignored(p));
+      const ignoredHits = paths.filter((p) => isIgnoredPath(p));
       skipping = ignoredHits.length > 0;
       if (skipping) {
         const display = paths[paths.length - 1] ?? ignoredHits[0];

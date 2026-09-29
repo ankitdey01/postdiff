@@ -28,7 +28,7 @@ Build one capability slice at a time, then stop. Verify it live with the user be
 ## Non-negotiable product decisions
 
 - Draft-first always: never post/publish without the user seeing and editing the draft first.
-- No platform publishing APIs in v1: X = `x.com/intent/tweet?text=...` URL (true one-click); LinkedIn/Medium = copy + open compose page + manual paste (no prefill URL exists). Reflect this asymmetry honestly.
+- No platform publishing APIs in v1: publish is copy-only (`tract publish [--blog|--x|--linkedin] [sha]` copies the accepted draft to the clipboard; the user pastes wherever they like). No intent URLs, no compose tabs, no OAuth — identical on every platform. Gate: latest version `accepted` + hash-matched to the file.
 - Significance filter: Jev-only (`is_significant` Noul via `@typesafe-ai/sdk`, `jev-latest`). No heuristic pre-pass. `tract generate --force` bypasses. For demos, pre-test the demo diff's Jev verdict.
 
 ## Skills

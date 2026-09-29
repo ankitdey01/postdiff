@@ -25,5 +25,5 @@ The committed commit generation and publish operate on, defaulting to the last c
 _Avoid_: diff input, revision, working copy
 
 **Publish**:
-The browser-based handoff of an approved draft — true prefill where the platform supports it, copy-plus-open otherwise.
+The copy of an approved draft to the clipboard — the user pastes it wherever they like. Copy-only on every platform; no browser tabs, no platform APIs.
 _Avoid_: posting, auto-publish, sharing

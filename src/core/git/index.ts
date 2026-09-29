@@ -106,6 +106,10 @@ export async function getParentMessage(cwd: string, sha: string): Promise<{ sha:
 /** Blob size cap: larger files are reported as "too-large" without reading them. */
 export const MAX_BLOB_BYTES = 1_000_000;
 
+function isMissingObjectMessage(msg: string): boolean {
+  return /does not exist|not a valid object|bad file/i.test(msg);
+}
+
 /**
  * File content at a commit. Null only when the path doesn't exist there
  * (deleted). "too-large" when the blob exceeds MAX_BLOB_BYTES.
@@ -117,7 +121,7 @@ export async function readFileAtCommit(cwd: string, sha: string, path: string): 
     if (Number.isFinite(size) && size > MAX_BLOB_BYTES) return "too-large";
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (/does not exist|not a valid object|bad file/i.test(msg)) return null;
+    if (isMissingObjectMessage(msg)) return null;
     throw err;
   }
   try {

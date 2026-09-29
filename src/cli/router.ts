@@ -7,6 +7,7 @@ import { Command } from "commander";
 import { command as contextCommand } from "./commands/context.js";
 import { command as generateCommand } from "./commands/generate.js";
 import { command as preferencesCommand } from "./commands/preferences.js";
+import { command as publishCommand } from "./commands/publish.js";
 import { command as referenceCommand } from "./commands/reference.js";
 import { command as reviewCommand } from "./commands/review.js";
 import { command as voiceCommand } from "./commands/voice.js";
@@ -54,6 +55,8 @@ function register(program: Command, cwd: string, cmd: TractCommand): void {
   });
 }
 
+const ALL_COMMANDS = [contextCommand, generateCommand, preferencesCommand, publishCommand, referenceCommand, reviewCommand, voiceCommand];
+
 /** Builds the program and parses argv. Commands set process.exitCode themselves. */
 export async function runProgram(argv: string[], cwd: string, version: string): Promise<void> {
   const program = new Command();
@@ -72,15 +75,7 @@ export async function runProgram(argv: string[], cwd: string, version: string): 
     })
     .addHelpText("after", "Env: TYPESAFE_API_KEY + GROQ_KEY (or cwd/.env); GROQ_KEY required for drafts unless the gate stops first.");
 
-  for (const cmd of [contextCommand, generateCommand, preferencesCommand, referenceCommand, reviewCommand, voiceCommand]) register(program, cwd, cmd);
-  program
-    .command("publish")
-    .description("publish a draft (next slice, not yet implemented)")
-    .allowUnknownOption()
-    .action(() => {
-      console.log("publish slice not yet implemented.");
-      process.exitCode = 1;
-    });
+  for (const cmd of ALL_COMMANDS) register(program, cwd, cmd);
 
   await program.parseAsync(argv);
 }

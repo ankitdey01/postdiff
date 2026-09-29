@@ -3,38 +3,30 @@
 // reject templates a rule from --reason (no LLM), then removes the version.
 
 import {
-  getTractHome,
   loadConfig,
   GroqGenerator,
   platformDraftFile,
-  platformPreferenceFile,
   readReviewState,
   initReview,
   recordVerdict,
   hashContent,
-  appendPreferenceRule,
-  MAX_PREFERENCE_RULES,
 } from "../../index.js";
-import { join } from "node:path";
-import { resolveDraftDir, readDraft, selectedFlags, isDevtoolsEnabled, loadDevtoolsTelemetry, devtoolsHint } from "../helpers.js";
+import { resolveDraftDir, readDraft, requestedPlatform, savePreferenceRule, isDevtoolsEnabled, loadDevtoolsTelemetry, devtoolsHint } from "../helpers.js";
 import type { CommandContext, TractCommand } from "../router.js";
-import type { Platform } from "../../index.js";
+import type { ReviewState } from "../../index.js";
 
-const PLATFORMS = ["blog", "x", "linkedin"] as const;
-
-function requestedPlatform(ctx: CommandContext): Platform | null {
-  const want = selectedFlags(ctx.opts, PLATFORMS);
-  if (want.length === 0) return null;
-  if (want.length > 1) {
-    console.error(`One platform at a time — pass one of --blog, --x, --linkedin (got ${want.map((p) => `--${p}`).join(", ")}).`);
-    process.exitCode = 1;
-    return null;
+function showDraft(platform: Parameters<typeof platformDraftFile>[0], sha: string, draftBody: string, state: ReviewState): void {
+  const latest = state.versions[state.versions.length - 1];
+  console.log(`--- ${platformDraftFile(platform)} @ ${sha.slice(0, 8)} [${latest?.status ?? "pending"}] ---`);
+  console.log(draftBody.trimEnd() || "(empty)");
+  console.log(`--- versions: ${state.versions.length}, decided: ${latest?.decidedAt ?? "never"} ---`);
+  for (const [i, v] of state.versions.entries()) {
+    console.log(`v${i + 1} [${v.status}]${v.reason ? ` reason: ${v.reason}` : ""}`);
   }
-  return (want[0] ?? null) as Platform | null;
 }
 
 async function run(ctx: CommandContext): Promise<void> {
-  const platform = requestedPlatform(ctx);
+  const platform = requestedPlatform(ctx.opts);
   if (platform === null) {
     if (process.exitCode !== 1) console.error("Pick a platform: --blog, --x, or --linkedin.");
     process.exitCode = 1;
@@ -60,13 +52,7 @@ async function run(ctx: CommandContext): Promise<void> {
   if (!state) state = await initReview(dir, platform, draftBody);
 
   if (!accept && !reject) {
-    const latest = state.versions[state.versions.length - 1];
-    console.log(`--- ${platformDraftFile(platform)} @ ${sha.slice(0, 8)} [${latest?.status ?? "pending"}] ---`);
-    console.log(draftBody.trimEnd() || "(empty)");
-    console.log(`--- versions: ${state.versions.length}, decided: ${latest?.decidedAt ?? "never"} ---`);
-    for (const [i, v] of state.versions.entries()) {
-      console.log(`v${i + 1} [${v.status}]${v.reason ? ` reason: ${v.reason}` : ""}`);
-    }
+    showDraft(platform, sha, draftBody, state);
     return;
   }
 
@@ -81,17 +67,7 @@ async function run(ctx: CommandContext): Promise<void> {
     } else {
       console.log(`rejected ${platformDraftFile(platform)}${outcome.fileDeleted ? " (version removed, no versions left)" : " (version removed)"}`);
     }
-    if (outcome.globalRule) {
-      const home = getTractHome();
-      const res = await appendPreferenceRule(join(home, "preferences"), platformPreferenceFile(platform), outcome.globalRule);
-      console.log(
-        res === "appended"
-          ? `platform rule saved to preferences/${platformPreferenceFile(platform)}`
-          : res === "appended-rotated"
-            ? `platform rule saved (oldest rule rotated out at cap ${MAX_PREFERENCE_RULES})`
-            : `platform rule already known — skipped`
-      );
-    }
+    if (outcome.globalRule) await savePreferenceRule(platform, outcome.globalRule);
     return;
   }
 
@@ -122,17 +98,7 @@ async function run(ctx: CommandContext): Promise<void> {
   if (outcome.state.versions[outcome.state.versions.length - 1]?.reason) {
     console.log(`reason: ${outcome.state.versions[outcome.state.versions.length - 1]?.reason}`);
   }
-  if (outcome.globalRule) {
-    const home = getTractHome();
-    const res = await appendPreferenceRule(join(home, "preferences"), platformPreferenceFile(platform), outcome.globalRule);
-    console.log(
-      res === "appended"
-        ? `platform rule saved to preferences/${platformPreferenceFile(platform)}`
-        : res === "appended-rotated"
-          ? `platform rule saved (oldest rule rotated out at cap ${MAX_PREFERENCE_RULES})`
-          : `platform rule already known — skipped`
-    );
-  }
+  if (outcome.globalRule) await savePreferenceRule(platform, outcome.globalRule);
 }
 
 export const command: TractCommand = {

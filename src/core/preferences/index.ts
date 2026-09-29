@@ -20,17 +20,15 @@ export type PreferenceFile = (typeof PREFERENCE_FILES)[number];
 export const MAX_PREFERENCE_RULES = 20;
 
 /** CLI platform flag -> preference file. */
+const PREFERENCE_FLAG_MAP: Record<string, PreferenceFile> = {
+  "--blog": "blog.md",
+  "--x": "x.md",
+  "--linkedin": "linkedin.md",
+};
+
 export function resolvePreferenceFile(flag: string | undefined): PreferenceFile | null {
-  switch (flag) {
-    case "--blog":
-      return "blog.md";
-    case "--x":
-      return "x.md";
-    case "--linkedin":
-      return "linkedin.md";
-    default:
-      return null;
-  }
+  if (!flag) return null;
+  return PREFERENCE_FLAG_MAP[flag] ?? null;
 }
 
 /** Platform id -> its preference file (`blog` -> `blog.md`). */
@@ -62,8 +60,6 @@ export async function appendPreferenceRule(
 ): Promise<"appended" | "duplicate" | "appended-rotated"> {
   const trimmed = rule.trim();
   if (!trimmed) throw new Error("Nothing to add — rule is empty.");
-  const current = await readSampleFile(preferencesDir, file);
-  if (splitEntries(current).includes(trimmed)) return "duplicate";
   const res = await appendSampleEntry(preferencesDir, file, trimmed, "Nothing to add — rule is empty.");
   if (res === "duplicate") return "duplicate";
   const rules = splitEntries(await readSampleFile(preferencesDir, file));

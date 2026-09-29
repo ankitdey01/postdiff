@@ -14,7 +14,7 @@ import {
 } from "../../index.js";
 import type { CommandContext, TractCommand } from "../router.js";
 import type { ReferenceFile } from "../../index.js";
-import { selectedFlags } from "../helpers.js";
+import { singleFlag } from "../helpers.js";
 
 function referenceDir(): string {
   return join(getTractHome(), "reference");
@@ -22,14 +22,14 @@ function referenceDir(): string {
 
 /** Reads --blog/--x/--linkedin (commander rejects anything else). */
 function platformFromOpts(ctx: CommandContext): ReferenceFile | null {
-  const pick = selectedFlags(ctx.opts, ["blog", "x", "linkedin"]);
-  if (pick.length === 0) return null;
-  if (pick.length > 1) {
-    console.error(`One file at a time — pass one of --blog, --x, --linkedin (got ${pick.map((p) => `--${p}`).join(", ")}).`);
-    process.exitCode = 1;
-    return null;
-  }
-  return platformReferenceFile(pick[0] as "blog" | "x" | "linkedin");
+  const pick = singleFlag(ctx.opts, ["blog", "x", "linkedin"]);
+  if (!pick) return null;
+  return platformReferenceFile(pick as "blog" | "x" | "linkedin");
+}
+
+async function showFile(dir: string, file: ReferenceFile): Promise<void> {
+  console.log(`--- ${file} ---`);
+  console.log((await readReferenceFile(dir, file)) || "(empty)");
 }
 
 async function run(ctx: CommandContext): Promise<void> {
@@ -41,13 +41,11 @@ async function run(ctx: CommandContext): Promise<void> {
     const file = platformFromOpts(ctx);
     if (process.exitCode === 1) return;
     if (file) {
-      console.log(`--- ${file} ---`);
-      console.log((await readReferenceFile(dir, file)) || "(empty)");
+      await showFile(dir, file);
       return;
     }
     for (const f of REFERENCE_FILES) {
-      console.log(`--- ${f} ---`);
-      console.log((await readReferenceFile(dir, f)) || "(empty)");
+      await showFile(dir, f);
     }
     return;
   }

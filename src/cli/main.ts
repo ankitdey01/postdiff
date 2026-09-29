@@ -23,6 +23,18 @@ async function loadEnvFile(cwd: string): Promise<void> {
   }
 }
 
+async function readVersion(): Promise<string> {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    return (
+      (JSON.parse(await readFile(join(here, "..", "..", "package.json"), "utf8")) as { version?: string }).version ?? "0.0.0"
+    );
+  } catch {
+    // Standalone runs outside the repo — version stays unknown.
+    return "0.0.0";
+  }
+}
+
 async function main(): Promise<void> {
   const cwd = process.cwd();
 
@@ -30,16 +42,7 @@ async function main(): Promise<void> {
   await ensureTractHome();
   await loadEnvFile(cwd);
 
-  let version = "0.0.0";
-  try {
-    const here = dirname(fileURLToPath(import.meta.url));
-    version =
-      (JSON.parse(await readFile(join(here, "..", "..", "package.json"), "utf8")) as { version?: string }).version ??
-      version;
-  } catch {
-    // Standalone runs outside the repo — version stays unknown.
-  }
-  await runProgram(process.argv, cwd, version);
+  await runProgram(process.argv, cwd, await readVersion());
 }
 
 main().catch((err) => {

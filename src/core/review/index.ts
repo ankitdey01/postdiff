@@ -126,22 +126,28 @@ export async function recordVerdict(input: VerdictInput): Promise<VerdictOutcome
   if (!state) throw new Error("No review state — generate a draft first.");
   const latest = state.versions[state.versions.length - 1];
   if (!latest) throw new Error("No review state — generate a draft first.");
+  if (!input.accept) return rejectVerdict(state, input);
+  return acceptVerdict(state, input, latest);
+}
+
+async function rejectVerdict(state: ReviewState, input: VerdictInput): Promise<VerdictOutcome> {
+  const latest = state.versions[state.versions.length - 1];
+  const reason = input.reason?.trim() || null;
+  const globalRule = reason ? rejectRuleFor(reason) : "";
+  if (!latest || latest.status !== "pending") return { kind: "rejected-kept", globalRule };
+  // Drop the pending version; no snapshot of on-disk edits ever happens here.
+  state.versions.pop();
+  if (state.versions.length === 0) {
+    await rm(reviewPath(input.dir, input.platform), { force: true });
+    return { kind: "rejected-removed", removed: true, fileDeleted: true, globalRule };
+  }
+  await writeReviewState(input.dir, input.platform, state);
+  return { kind: "rejected-removed", removed: true, fileDeleted: false, globalRule };
+}
+
+async function acceptVerdict(state: ReviewState, input: VerdictInput, latest: ReviewVersion): Promise<VerdictOutcome> {
   const reason = input.reason?.trim() || null;
   const at = new Date().toISOString();
-
-  if (!input.accept) {
-    const globalRule = reason ? rejectRuleFor(reason) : "";
-    if (latest.status !== "pending") return { kind: "rejected-kept", globalRule };
-    // Drop the pending version; no snapshot of on-disk edits ever happens here.
-    state.versions.pop();
-    if (state.versions.length === 0) {
-      await rm(reviewPath(input.dir, input.platform), { force: true });
-      return { kind: "rejected-removed", removed: true, fileDeleted: true, globalRule };
-    }
-    await writeReviewState(input.dir, input.platform, state);
-    return { kind: "rejected-removed", removed: true, fileDeleted: false, globalRule };
-  }
-
   const currentHash = hashContent(input.fileContent);
   if (currentHash === latest.hash) {
     latest.status = "accepted";

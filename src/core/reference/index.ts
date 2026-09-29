@@ -2,8 +2,8 @@
 // them and writes a similar variation for the new commit. V1: static files only.
 // fs logic lives in ../samplefile; this module preserves the public reference API.
 
-import { SAMPLE_SEPARATOR } from "../voice/index.js";
 import {
+  SAMPLE_SEPARATOR,
   ensureSampleFiles,
   readSampleFile,
   appendSampleEntry,
@@ -22,17 +22,15 @@ export function platformReferenceFile(platform: "blog" | "x" | "linkedin"): Refe
 }
 
 /** CLI platform flag -> reference file. */
+const REFERENCE_FLAG_MAP: Record<string, ReferenceFile> = {
+  "--blog": "blog.md",
+  "--x": "x.md",
+  "--linkedin": "linkedin.md",
+};
+
 export function resolveReferenceFile(flag: string | undefined): ReferenceFile | null {
-  switch (flag) {
-    case "--blog":
-      return "blog.md";
-    case "--x":
-      return "x.md";
-    case "--linkedin":
-      return "linkedin.md";
-    default:
-      return null;
-  }
+  if (!flag) return null;
+  return REFERENCE_FLAG_MAP[flag] ?? null;
 }
 
 /** Pre-creates the 3 reference files (empty) so `remove` can clear and `view` can read. */

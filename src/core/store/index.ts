@@ -34,28 +34,19 @@ function sha1Hex(s: string, len: number): string {
   return createHash("sha1").update(s).digest("hex").slice(0, len);
 }
 
-function gitRemote(cwd: string): Promise<string | null> {
+/** Runs a git command that may fail (null on error). */
+function gitQuery(cwd: string, args: string[]): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile("git", ["remote", "get-url", "origin"], { cwd }, (err, stdout) => {
-      if (err) resolve(null);
-      else resolve(stdout.trim() || null);
-    });
-  });
-}
-
-function gitTopLevel(cwd: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    execFile("git", ["rev-parse", "--show-toplevel"], { cwd }, (err, stdout) => {
-      if (err) resolve(null);
-      else resolve(stdout.trim() || null);
+    execFile("git", args, { cwd }, (err, stdout) => {
+      resolve(err ? null : stdout.trim() || null);
     });
   });
 }
 
 /** Namespace drafts per repo inside the global store. */
 export async function getRepoSlug(cwd: string): Promise<string> {
-  const remote = await gitRemote(cwd);
-  const top = await gitTopLevel(cwd);
+  const remote = await gitQuery(cwd, ["remote", "get-url", "origin"]);
+  const top = await gitQuery(cwd, ["rev-parse", "--show-toplevel"]);
   const base = top ?? cwd;
   const key = remote ?? base;
   const name = (basename(base) || "repo").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 40);

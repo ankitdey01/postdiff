@@ -34,7 +34,7 @@ Solo/indie developers building in public with an existing or growing social pres
 ## 6. Non-negotiable Product Decisions (decision log)
 
 - **Draft-first, always.** A "Post" button is allowed, but only ever appears after the user has seen and can edit the draft. No silent/autonomous posting, ever.
-- **No direct platform APIs for publishing in v1.** Rejected in favor of browser share-intents after discovering the real cost/friction: X posting via API requires a paid developer tier; LinkedIn write-scopes require app review; neither is worth it when a browser-based flow works for free.
+- **No direct platform APIs for publishing in v1.** Rejected in favor of copy-only after discovering the real cost/friction: X posting via API requires a paid developer tier; LinkedIn write-scopes require app review; neither is worth it when the user can paste. `tract publish [--blog|--x|--linkedin] [sha]` copies the accepted draft to the clipboard — identical on every platform, no tabs, no OAuth.
 - **Simplest interface first.** The first surface is terminal-native; any editor integration comes later as a thin UI over the same engine — proving the engine works before adding UI complexity.
 - **Engine is UI-agnostic.** The content engine never depends on any specific interface. This keeps it portable (future editor plugins, CI actions, etc.) and testable without spinning up an editor.
 
@@ -76,11 +76,9 @@ Solo/indie developers building in public with an existing or growing social pres
 - First surface: drafts shown in the terminal-native interface for review, with persistence to a local file
 - Later editor integration: panel with edit/approve/regenerate/reject actions
 
-### 7.6 Publish — asymmetric by platform, intentionally
-- **X**: genuine one-click. Uses the public compose-intent URL (`x.com/intent/tweet?text=...`) which truly pre-fills the post text. No auth, no API, no app registration.
-- **LinkedIn**: no public API/URL exists to pre-fill personal post text (their share URLs only pre-fill a link preview, not free-form post content). Flow: copy content to clipboard, open LinkedIn's compose page in a new tab, user pastes manually.
-- **Medium**: same limitation as LinkedIn — no compose-prefill URL exists at all, public or documented. Same copy + open + manual paste flow.
-- This asymmetry should be reflected honestly in product messaging — X is a true one-click; LinkedIn/Medium are "we got you 90% of the way there."
+### 7.6 Publish — copy-only, identical on every platform (decided)
+- `tract publish [--blog|--x|--linkedin] [sha]` (default HEAD) copies the accepted draft to the clipboard; the user pastes wherever they like. No intent URLs, no compose tabs, no OAuth in v1.
+- Gate: the stored draft's latest version must be `accepted` and hash-match the file — edited-after-accept refuses with "review --accept first". Nothing is recorded after copying; drafts + review verdicts already are the audit trail.
 
 ## 8. Architecture (conceptual — implementation TBD)
 
@@ -108,7 +106,7 @@ TBD — to be decided during build. Constraints only:
 
 - Local-first, single-user
 - Native git for history/diffs — no hosted-git API or webhook dependency
-- Browser-based publishing — no paid platform API tiers, no OAuth in v1
+- Browser-free publishing — no paid platform API tiers, no OAuth, no tabs in v1
 
 ## 10. Command Surface (decided draft — refinements open)
 
@@ -118,7 +116,7 @@ TBD — to be decided during build. Constraints only:
 - `tract review [<sha>] [--blog|--x|--linkedin] [--accept|--reject] [--reason "<text>"]` — displays the stored draft, records the verdict in `review-<platform>.json` (versions with content hashes + preference summaries; reject requires no reason, defaults recorded); verdicts bind to exact text, edits snapshot new versions
 - `tract reference [add|create|remove|view] [--blog|--x|--linkedin] ["<post>"]` — real-post examples per platform (`~/.tract/reference/`); studied as style variations, never copied
 - `tract preferences [add|create|remove|view] [--blog|--x|--linkedin] ["<rule>"]` — global platform taste rules (`~/.tract/preferences/`); distilled automatically at changed-hash verdicts (dual-output preference call: commit preference + style-only global rule), curated by hand; cap 20/platform, oldest rotates; applied to every generation including first drafts
-- `tract publish --platform x|linkedin|medium --commit <sha> [--copy]` — drafts read from the global store (`~/.tract/repos/<repo-slug>/<sha>/`); X opens intent URL (true prefill); LinkedIn/Medium use copy + open compose page (no prefill URL exists, per §7.6); `--copy` forces the copy path
+- `tract publish [<sha>] [--blog|--x|--linkedin]` — copies the accepted draft to the clipboard (copy-only on every platform, per §7.6); default `<sha>` = HEAD; gate: latest version `accepted` + hash-matched to the file, else refuse with "review --accept first"
 - Store (decided): no repo-local `.tract/` — everything under user home `~/.tract/` (Windows: `C:\Users\<you>\.tract\`), namespaced per repo for drafts; YouTube deferred so no `--youtube` voice/platform in v1
 
 ## 11. Competitive Landscape
@@ -152,7 +150,7 @@ TBD — to be decided during build. Constraints only:
 3. Voice profile loader (per-platform `.md` files: `blog.md`, `x.md`, `linkedin.md`)
 4. Generation — prompt builder + Groq call via Vercel AI SDK, one platform per request (Blog, X, LinkedIn; YouTube deferred)
 5. Review output (display + file persistence to global `~/.tract`)
-6. Publish — X intent URL (v1 target), LinkedIn copy+open (stretch)
+6. Publish — copy-only (`clipboardy`; gate: accepted + hash-matched, per §7.6)
 7. Feedback loop — V2 (deferred): persist edit/accept/reject signal, feed back into voice profile. V1 ships static voice only.
 8. Editor integration — same engine, adds review UI
 9. Test/eval harness — DEFERRED (unit + golden fixtures + live-Jev eval noted for future, skipped for the significance slice)
@@ -160,7 +158,7 @@ TBD — to be decided during build. Constraints only:
 ## 15. Hackathon Demo Plan
 
 - Voice profile pre-loaded with real past posts before demo day — no live calibration, no cold-start risk on stage
-- Live demo flow: real commit made live → LLM significance check → all 4 formats generated → post via X intent URL, live, on stage
+- Live demo flow: real commit made live → LLM significance check → all 4 formats generated → publish copies the accepted draft, paste live, on stage
 - Significance filter runs LLM-judged (not heuristic-only) for the demo, specifically because it's the more impressive path — mitigated by the timeout+fallback described in 7.2
 - Dogfooding note: whether the live commit is against Tract's own repo (showing the tool write about itself being built) or a separate demo repo is a presentation choice, not yet locked
 

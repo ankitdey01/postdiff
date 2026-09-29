@@ -27,6 +27,7 @@
     "@ai-sdk/groq": "^4.0.46",
     "@typesafe-ai/sdk": "latest",
     "ai": "^7.0.107",
+    "clipboardy": "^5.3.2",
     "commander": "^15.0.0",
     "zod": "^4.6.5"
   },

@@ -13,7 +13,7 @@ import {
 } from "../../index.js";
 import type { CommandContext, TractCommand } from "../router.js";
 import type { VoiceFile } from "../../index.js";
-import { selectedFlags } from "../helpers.js";
+import { singleFlag } from "../helpers.js";
 
 function voiceDir(): string {
   return join(getTractHome(), "voice");
@@ -21,14 +21,14 @@ function voiceDir(): string {
 
 /** Reads --voice/--blog/--x/--linkedin (commander rejects anything else). */
 function platformFromOpts(ctx: CommandContext): VoiceFile | null {
-  const pick = selectedFlags(ctx.opts, ["voice", "blog", "x", "linkedin"]);
-  if (pick.length === 0) return null;
-  if (pick.length > 1) {
-    console.error(`One file at a time — pass one of --voice, --blog, --x, --linkedin (got ${pick.map((p) => `--${p}`).join(", ")}).`);
-    process.exitCode = 1;
-    return null;
-  }
-  return resolveVoiceFile(`--${pick[0]}`);
+  const pick = singleFlag(ctx.opts, ["voice", "blog", "x", "linkedin"]);
+  if (!pick) return null;
+  return resolveVoiceFile(`--${pick}`);
+}
+
+async function showFile(dir: string, file: VoiceFile): Promise<void> {
+  console.log(`--- ${file} ---`);
+  console.log((await readVoiceFile(dir, file)) || "(empty)");
 }
 
 async function run(ctx: CommandContext): Promise<void> {
@@ -40,13 +40,11 @@ async function run(ctx: CommandContext): Promise<void> {
     const file = platformFromOpts(ctx);
     if (process.exitCode === 1) return;
     if (file) {
-      console.log(`--- ${file} ---`);
-      console.log((await readVoiceFile(dir, file)) || "(empty)");
+      await showFile(dir, file);
       return;
     }
     for (const f of VOICE_FILES) {
-      console.log(`--- ${f} ---`);
-      console.log((await readVoiceFile(dir, f)) || "(empty)");
+      await showFile(dir, f);
     }
     return;
   }
