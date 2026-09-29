@@ -1,4 +1,4 @@
-// `tract generate` — thin CLI wrapper; all logic lives in core/generation/index.ts.
+// `postdiff generate` — thin CLI wrapper; all logic lives in core/generation/index.ts.
 
 import { generatePipeline } from "../../index.js";
 import type { CommandContext, TractCommand } from "../router.js";

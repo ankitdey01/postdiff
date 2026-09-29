@@ -1,10 +1,10 @@
-# Tract — Product Requirements Document
+# Postdiff — Product Requirements Document
 
 **Status:** Pre-release. This document is the single source of truth for product, design flow, and decisions made so far. Implementation stack is settled as TypeScript + Node (see `package.json`, `tsconfig.json`, `src/`); the LLM provider and storage are swappable behind interfaces (mocked in tests). Only genuinely open build-time choices (concrete provider, backend, test/eval harness) remain to be decided during build.
 
 ## 1. Name & Positioning
 
-- **Name:** Tract — double meaning: a short written work, and the tracking function of git.
+- **Name:** Postdiff — double meaning: a short written work, and the tracking function of git.
 - **Core value prop:** it just knows who you are, how you talk, and what you're building — no re-explaining your identity/context every time you want to post about your work.
 
 ## 2. Problem
@@ -34,7 +34,7 @@ Solo/indie developers building in public with an existing or growing social pres
 ## 6. Non-negotiable Product Decisions (decision log)
 
 - **Draft-first, always.** A "Post" button is allowed, but only ever appears after the user has seen and can edit the draft. No silent/autonomous posting, ever.
-- **No direct platform APIs for publishing in v1.** Rejected in favor of copy-only after discovering the real cost/friction: X posting via API requires a paid developer tier; LinkedIn write-scopes require app review; neither is worth it when the user can paste. `tract publish [--blog|--x|--linkedin] [sha]` copies the accepted draft to the clipboard — identical on every platform, no tabs, no OAuth.
+- **No direct platform APIs for publishing in v1.** Rejected in favor of copy-only after discovering the real cost/friction: X posting via API requires a paid developer tier; LinkedIn write-scopes require app review; neither is worth it when the user can paste. `postdiff publish [--blog|--x|--linkedin] [sha]` copies the accepted draft to the clipboard — identical on every platform, no tabs, no OAuth.
 - **Simplest interface first.** The first surface is terminal-native; any editor integration comes later as a thin UI over the same engine — proving the engine works before adding UI complexity.
 - **Engine is UI-agnostic.** The content engine never depends on any specific interface. This keeps it portable (future editor plugins, CI actions, etc.) and testable without spinning up an editor.
 
@@ -49,12 +49,12 @@ Solo/indie developers building in public with an existing or growing social pres
 - Single Jev Noul judgment (`is_significant`) over diff + commit-message state via `@typesafe-ai/sdk` (`jev-latest`). No heuristic pre-pass, no generic LLM prompt-parse step.
 - State: `{ diff, commitMessage, filesChanged }`. `diff` is shaped before judging: noise paths (`.agents/`, `node_modules/`, `dist/`, lockfiles, `.env`) collapse to filename-only; full filenames still reach Jev via `filesChanged`. Shaping trims input only — it never decides significance. Question: `Is this change worth posting about?` with `true`/`false` criteria pinning "worth posting" vs. trivial/noise.
 - Pass (`noul >= threshold`, default 0.5, tunable after dogfooding) → proceed to context building + generation. Fail → stop, log, wait for next trigger.
-- `tract generate --force` bypasses the judge entirely.
+- `postdiff generate --force` bypasses the judge entirely.
 - Timeouts/errors: SDK retry with backoff; on persistent failure log a warning + proceed as if `--force` (force-through). A Jev verdict of fail still stops — only errors force through, so a hung API never blocks real usage or a demo. Jev stays the sole significance decider.
 - Rehearsal note: for any live/demo use, test the actual diff being used ahead of time so the Jev verdict is already known, not discovered live.
 
 ### 7.3 Voice Profile (decided: global, paired)
-- Global per-user, stored under user home (`~/.tract/voice/` — e.g. `C:\Users\<you>\.tract\voice\` on Windows). No repo-local voice in v1; per-repo tone scoping deferred.
+- Global per-user, stored under user home (`~/.postdiff/voice/` — e.g. `C:\Users\<you>\.postdiff\voice\` on Windows). No repo-local voice in v1; per-repo tone scoping deferred.
 - 4 files, pre-created: `voice.md` (default, always attached) + per-platform `x.md`, `linkedin.md`, `blog.md`. Generation prompt pairs `voice.md + <platform>.md`. No YouTube voice in v1 (YouTube format deferred, see §7.4).
 - `voice add --<platform> "<pasted string>"` appends (validated: trim, min-length, exact-dedupe); `voice create --<platform> "<string>"` overwrites; `remove --<platform>` clears the file (never deletes); `view [--<platform>]` shows all at once or one filtered.
 - Used as few-shot context in generation prompts. V1 is static files only (add/create/remove/view) — no auto-learning.
@@ -67,7 +67,7 @@ Solo/indie developers building in public with an existing or growing social pres
 
 ### 7.4 Generation (decided)
 - Input: committed diff + commit context + README (where available) + paired voice profile (`voice.md` + platform file) + target platform
-- One platform per request via `tract generate [<sha>] [--force] [--blog|--x|--linkedin]` — no fan-out; each platform drafted separately on demand
+- One platform per request via `postdiff generate [<sha>] [--force] [--blog|--x|--linkedin]` — no fan-out; each platform drafted separately on demand
 - Provider: Groq (BYOK key in `.env`) behind our own `Generator` interface, implemented with the Vercel AI SDK (`ai` + `@ai-sdk/groq`; model pinned in `config.json`). Single-stage: code-assembled prompt carries the full raw context — no prompt-builder model call.
 - Web enrichment: Groq browser search attached as an agent-decided tool (no flag, no extra key — billed as tokens on the same key). The prompt permits 0-2 searches; the model skips browsing when the context alone suffices. gpt-oss-only; changing `genModel` off gpt-oss silently drops search.
 - Blog format includes a configurable target word count; blog output is Markdown (links as `[text](url)`)
@@ -77,7 +77,7 @@ Solo/indie developers building in public with an existing or growing social pres
 - Later editor integration: panel with edit/approve/regenerate/reject actions
 
 ### 7.6 Publish — copy-only, identical on every platform (decided)
-- `tract publish [--blog|--x|--linkedin] [sha]` (default HEAD) copies the accepted draft to the clipboard; the user pastes wherever they like. No intent URLs, no compose tabs, no OAuth in v1.
+- `postdiff publish [--blog|--x|--linkedin] [sha]` (default HEAD) copies the accepted draft to the clipboard; the user pastes wherever they like. No intent URLs, no compose tabs, no OAuth in v1.
 - Gate: the stored draft's latest version must be `accepted` and hash-match the file — edited-after-accept refuses with "review --accept first". Nothing is recorded after copying; drafts + review verdicts already are the audit trail.
 
 ## 8. Architecture (conceptual — implementation TBD)
@@ -86,7 +86,7 @@ Pipeline, in order:
 
 1. Diff/commit extraction from the local git repo
 2. Significance filter (Jev Noul judgment only; `--force` bypasses)
-3. Context building (commit message + parent + shaped diff + file contents only — no voice, reference, or preferences) — gathered once per sha, cached as `context.json` in `~/.tract/repos/<slug>/<sha>/`, reused by every later `generate`/`context` call for that sha. Voice, reference, and preference files are read fresh from `~/.tract` on every `generate` call, never cached in `context.json`
+3. Context building (commit message + parent + shaped diff + file contents only — no voice, reference, or preferences) — gathered once per sha, cached as `context.json` in `~/.postdiff/repos/<slug>/<sha>/`, reused by every later `generate`/`context` call for that sha. Voice, reference, and preference files are read fresh from `~/.postdiff` on every `generate` call, never cached in `context.json`
 4. Generation (prompt + external LLM, provider TBD)
 5. Human review (edit/approve/regenerate/reject — required before publish)
 6. Publish (browser-based; X intent vs. copy+open per §7.6)
@@ -110,25 +110,25 @@ TBD — to be decided during build. Constraints only:
 
 ## 10. Command Surface (decided draft — refinements open)
 
-- `tract context [<sha>] [--json]` — generation-ready context inspector for a commit (replaces retired `tract diff`; no LLM, no `--staged` pre-commit preview in v1)
-- `tract generate [<sha>] [--force] [--blog|--x|--linkedin]` — Jev gate then drafts **one** requested platform; default `<sha>` = HEAD; `--force` skips the Jev gate
-- `tract voice [add|create|remove|view] [--blog|--x|--linkedin] ["<pasted string>"]` — `add` appends, `create` overwrites, `remove` clears, `view` shows all (flag filters to one); `voice.md` always pairs with the platform file
-- `tract review [<sha>] [--blog|--x|--linkedin] [--accept|--reject] [--reason "<text>"]` — displays the stored draft, records the verdict in `review-<platform>.json` (versions with content hashes + preference summaries; reject requires no reason, defaults recorded); verdicts bind to exact text, edits snapshot new versions
-- `tract reference [add|create|remove|view] [--blog|--x|--linkedin] ["<post>"]` — real-post examples per platform (`~/.tract/reference/`); studied as style variations, never copied
-- `tract preferences [add|create|remove|view] [--blog|--x|--linkedin] ["<rule>"]` — global platform taste rules (`~/.tract/preferences/`); distilled automatically at changed-hash verdicts (dual-output preference call: commit preference + style-only global rule), curated by hand; cap 20/platform, oldest rotates; applied to every generation including first drafts
-- `tract publish [<sha>] [--blog|--x|--linkedin]` — copies the accepted draft to the clipboard (copy-only on every platform, per §7.6); default `<sha>` = HEAD; gate: latest version `accepted` + hash-matched to the file, else refuse with "review --accept first"
-- Store (decided): no repo-local `.tract/` — everything under user home `~/.tract/` (Windows: `C:\Users\<you>\.tract\`), namespaced per repo for drafts; YouTube deferred so no `--youtube` voice/platform in v1
+- `postdiff context [<sha>] [--json]` — generation-ready context inspector for a commit (replaces retired `postdiff diff`; no LLM, no `--staged` pre-commit preview in v1)
+- `postdiff generate [<sha>] [--force] [--blog|--x|--linkedin]` — Jev gate then drafts **one** requested platform; default `<sha>` = HEAD; `--force` skips the Jev gate
+- `postdiff voice [add|create|remove|view] [--blog|--x|--linkedin] ["<pasted string>"]` — `add` appends, `create` overwrites, `remove` clears, `view` shows all (flag filters to one); `voice.md` always pairs with the platform file
+- `postdiff review [<sha>] [--blog|--x|--linkedin] [--accept|--reject] [--reason "<text>"]` — displays the stored draft, records the verdict in `review-<platform>.json` (versions with content hashes + preference summaries; reject requires no reason, defaults recorded); verdicts bind to exact text, edits snapshot new versions
+- `postdiff reference [add|create|remove|view] [--blog|--x|--linkedin] ["<post>"]` — real-post examples per platform (`~/.postdiff/reference/`); studied as style variations, never copied
+- `postdiff preferences [add|create|remove|view] [--blog|--x|--linkedin] ["<rule>"]` — global platform taste rules (`~/.postdiff/preferences/`); distilled automatically at changed-hash verdicts (dual-output preference call: commit preference + style-only global rule), curated by hand; cap 20/platform, oldest rotates; applied to every generation including first drafts
+- `postdiff publish [<sha>] [--blog|--x|--linkedin]` — copies the accepted draft to the clipboard (copy-only on every platform, per §7.6); default `<sha>` = HEAD; gate: latest version `accepted` + hash-matched to the file, else refuse with "review --accept first"
+- Store (decided): no repo-local `.postdiff/` — everything under user home `~/.postdiff/` (Windows: `C:\Users\<you>\.postdiff\`), namespaced per repo for drafts; YouTube deferred so no `--youtube` voice/platform in v1
 
 ## 11. Competitive Landscape
 
-| Tool | What it does | How Tract differs |
+| Tool | What it does | How Postdiff differs |
 |---|---|---|
 | CommitLore | Reads diffs, generates Twitter/LinkedIn/blog content, manual trigger, $12/mo | Cloud/GitHub-webhook + OAuth based. No YouTube-script format. |
-| CommitStream | Commit → X/LinkedIn posts, markets "AI learns your voice" | Same cloud/webhook model; "learns your voice" has no specified mechanism. Tract's is a named 3-signal loop. |
+| CommitStream | Commit → X/LinkedIn posts, markets "AI learns your voice" | Same cloud/webhook model; "learns your voice" has no specified mechanism. Postdiff's is a named 3-signal loop. |
 | Posterly (Ship & Share) | GitHub-commit-to-post as one feature of a broader scheduling platform | Built for scheduled multi-platform auto-publish, not a draft-first developer tool |
 | Postgit / SideProjectBuddy | Commit → tweet/LinkedIn pipelines, GitHub-connected | Same cloud/OAuth pattern |
 
-**Core differentiation:** every competitor found is a cloud SaaS requiring GitHub OAuth. Tract is local-first and terminal/editor-native — works on uncommitted or private-repo work without granting any third party repo access, and runs in the same session where the code was written. None of the competitors surfaced a live "is this worth posting" judgment step as a first-class feature, and none offer a YouTube-script format.
+**Core differentiation:** every competitor found is a cloud SaaS requiring GitHub OAuth. Postdiff is local-first and terminal/editor-native — works on uncommitted or private-repo work without granting any third party repo access, and runs in the same session where the code was written. None of the competitors surfaced a live "is this worth posting" judgment step as a first-class feature, and none offer a YouTube-script format.
 
 ## 12. Business Model (draft, not finalized)
 
@@ -149,7 +149,7 @@ TBD — to be decided during build. Constraints only:
 2. Significance filter (Jev Noul judge + `--force` bypass)
 3. Voice profile loader (per-platform `.md` files: `blog.md`, `x.md`, `linkedin.md`)
 4. Generation — prompt builder + Groq call via Vercel AI SDK, one platform per request (Blog, X, LinkedIn; YouTube deferred)
-5. Review output (display + file persistence to global `~/.tract`)
+5. Review output (display + file persistence to global `~/.postdiff`)
 6. Publish — copy-only (`clipboardy`; gate: accepted + hash-matched, per §7.6)
 7. Feedback loop — V2 (deferred): persist edit/accept/reject signal, feed back into voice profile. V1 ships static voice only.
 8. Editor integration — same engine, adds review UI
@@ -160,12 +160,12 @@ TBD — to be decided during build. Constraints only:
 - Voice profile pre-loaded with real past posts before demo day — no live calibration, no cold-start risk on stage
 - Live demo flow: real commit made live → LLM significance check → all 4 formats generated → publish copies the accepted draft, paste live, on stage
 - Significance filter runs LLM-judged (not heuristic-only) for the demo, specifically because it's the more impressive path — mitigated by the timeout+fallback described in 7.2
-- Dogfooding note: whether the live commit is against Tract's own repo (showing the tool write about itself being built) or a separate demo repo is a presentation choice, not yet locked
+- Dogfooding note: whether the live commit is against Postdiff's own repo (showing the tool write about itself being built) or a separate demo repo is a presentation choice, not yet locked
 
 ## 16. Open Questions
 
 - Voice profile scope: global per-user vs. per-project (Section 7.3)
-- Real, verified statistics for the business/impact case are not yet sourced — competitor-published engagement stats must not be used as Tract's own supporting facts
+- Real, verified statistics for the business/impact case are not yet sourced — competitor-published engagement stats must not be used as Postdiff's own supporting facts
 - Pricing model numbers not yet modeled against actual API costs
-- Team name/branding beyond the product name "Tract" not yet finalized
+- Team name/branding beyond the product name "Postdiff" not yet finalized
 - Implementation stack (language, runtime, project layout, LLM provider, storage mechanism, test runner) — all to be decided during build

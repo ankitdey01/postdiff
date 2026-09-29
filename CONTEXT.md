@@ -1,4 +1,4 @@
-# Tract
+# Postdiff
 
 Turning git commits into ready-to-post drafts in the author's own voice, always reviewed before publishing.
 

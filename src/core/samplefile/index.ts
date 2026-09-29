@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 /** Record separator between stored entries. Distinct from a bare Markdown `---` line. */
-export const SAMPLE_SEPARATOR = "\n--- tract-entry ---\n";
+export const SAMPLE_SEPARATOR = "\n--- postdiff-entry ---\n";
 
 export function splitEntries(content: string): string[] {
   return content

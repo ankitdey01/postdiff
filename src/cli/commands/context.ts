@@ -1,4 +1,4 @@
-// `tract context` — inspect the generation-ready context for a commit (no LLM).
+// `postdiff context` — inspect the generation-ready context for a commit (no LLM).
 
 import { loadOrGatherCommitContext } from "../../index.js";
 import type { CommandContext, TractCommand } from "../router.js";

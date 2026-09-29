@@ -1,4 +1,4 @@
-// `tract preferences` — manage global platform taste rules (~/.tract/preferences/).
+// `postdiff preferences` — manage global platform taste rules (~/.postdiff/preferences/).
 // Distilled automatically at review verdicts; curated by hand here.
 
 import { join } from "node:path";
@@ -54,7 +54,7 @@ async function run(ctx: CommandContext): Promise<void> {
     const file = platformFromOpts(ctx);
     if (process.exitCode === 1) return;
     if (!file) {
-      console.error(`Specify a file: --blog, --x, or --linkedin. e.g. tract preferences ${sub} --x "<rule>"`);
+      console.error(`Specify a file: --blog, --x, or --linkedin. e.g. postdiff preferences ${sub} --x "<rule>"`);
       process.exitCode = 1;
       return;
     }
@@ -80,7 +80,7 @@ async function run(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  console.log('Usage: tract preferences [add|create|remove|view] [--blog|--x|--linkedin] ["<rule>"]');
+  console.log('Usage: postdiff preferences [add|create|remove|view] [--blog|--x|--linkedin] ["<rule>"]');
   process.exitCode = 1;
 }
 

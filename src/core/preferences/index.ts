@@ -1,4 +1,4 @@
-// Global platform taste: distilled rules in ~/.tract/preferences/.
+// Global platform taste: distilled rules in ~/.postdiff/preferences/.
 // Unlike review versions (per-commit episodes), these apply to every generation
 // including first drafts. Same record format as voice/reference. V1: static +
 // verdict-distilled appends. Cap keeps the file scannable; oldest rotates out.
