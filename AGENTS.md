@@ -1,4 +1,4 @@
-# AGENTS.md — Tract
+# AGENTS.md — Postdiff
 
 The following instrucions and PRD.md doesnt solely represent the final product. You have complete right to cross question me and suggest me better workaround if needed and valid. Remember one thing, we dont need to build everything from scratch, thats not the point, there will be better already created specific tools and libraries for specific tasks that needs to be done. You should always find and suggest those to me. 
 Below is just a rough sketch of the overall product.
@@ -11,7 +11,7 @@ Don't overcomplicate, instead do smart engineering changes. Dont over engineer s
 
 ## Current state
 
-Scaffolded: TypeScript + Node CLI (`src/`, `tsconfig.json`, `npm run build`). Significance slice live (`tract diff`, `tract generate` with Jev gate). Voice, generation, publish slices still open. Test/eval harness deferred (PRD §14.9). Do not assume test/lint/CI commands exist.
+Scaffolded: TypeScript + Node CLI (`src/`, `tsconfig.json`, `npm run build`). Significance slice live (`postdiff diff`, `postdiff generate` with Jev gate). Voice, generation, publish slices still open. Test/eval harness deferred (PRD §14.9). Do not assume test/lint/CI commands exist.
 
 ## Design flow (from PRD §8, implementation TBD)
 
@@ -28,8 +28,8 @@ Build one capability slice at a time, then stop. Verify it live with the user be
 ## Non-negotiable product decisions
 
 - Draft-first always: never post/publish without the user seeing and editing the draft first.
-- No platform publishing APIs in v1: publish is copy-only (`tract publish [--blog|--x|--linkedin] [sha]` copies the accepted draft to the clipboard; the user pastes wherever they like). No intent URLs, no compose tabs, no OAuth — identical on every platform. Gate: latest version `accepted` + hash-matched to the file.
-- Significance filter: Jev-only (`is_significant` Noul via `@typesafe-ai/sdk`, `jev-latest`). No heuristic pre-pass. `tract generate --force` bypasses. For demos, pre-test the demo diff's Jev verdict.
+- No platform publishing APIs in v1: publish is copy-only (`postdiff publish [--blog|--x|--linkedin] [sha]` copies the accepted draft to the clipboard; the user pastes wherever they like). No intent URLs, no compose tabs, no OAuth — identical on every platform. Gate: latest version `accepted` + hash-matched to the file.
+- Significance filter: Jev-only (`is_significant` Noul via `@typesafe-ai/sdk`, `jev-latest`). No heuristic pre-pass. `postdiff generate --force` bypasses. For demos, pre-test the demo diff's Jev verdict.
 
 ## Skills
 
@@ -46,7 +46,7 @@ Build one capability slice at a time, then stop. Verify it live with the user be
 
 ### Issue tracker
 
-Issues live in GitHub Issues for `ankitdey01/tract` (uses `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues for `ankitdey01/postdiff` (uses `gh` CLI). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
