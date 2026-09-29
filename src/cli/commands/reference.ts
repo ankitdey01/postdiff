@@ -1,4 +1,4 @@
-// `tract reference` — manage real-post examples per platform (~/.tract/reference/).
+// `postdiff reference` — manage real-post examples per platform (~/.postdiff/reference/).
 // Mirrors `voice`: add appends, create overwrites, remove clears, view shows.
 
 import { join } from "node:path";
@@ -54,7 +54,7 @@ async function run(ctx: CommandContext): Promise<void> {
     const file = platformFromOpts(ctx);
     if (process.exitCode === 1) return;
     if (!file) {
-      console.error(`Specify a file: --blog, --x, or --linkedin. e.g. tract reference ${sub} --x "<post>"`);
+      console.error(`Specify a file: --blog, --x, or --linkedin. e.g. postdiff reference ${sub} --x "<post>"`);
       process.exitCode = 1;
       return;
     }
@@ -74,7 +74,7 @@ async function run(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  console.log('Usage: tract reference [add|create|remove|view] [--blog|--x|--linkedin] ["<post>"]');
+  console.log('Usage: postdiff reference [add|create|remove|view] [--blog|--x|--linkedin] ["<post>"]');
   process.exitCode = 1;
 }
 
