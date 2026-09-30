@@ -1,7 +1,7 @@
 // Prompt assembly: deterministic. Template + CommitContext + paired voice.
 // No model call here — single-stage generation carries the full raw context.
 
-import type { CommitContext } from "../context/index.js";
+import type { CommitContext } from "../source/context.js";
 import type { Platform } from "../../shared/types.js";
 import { REFERENCE_INSTRUCTION, SEARCH_INSTRUCTION } from "../prompts.js";
 import { platformSpec } from "./platforms.js";

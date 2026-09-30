@@ -61,7 +61,7 @@ const ALL_COMMANDS = [contextCommand, generateCommand, preferencesCommand, publi
 export async function runProgram(argv: string[], cwd: string, version: string): Promise<void> {
   const program = new Command();
   program
-    .name("tract")
+    .name("postdiff")
     .description("turn commits into drafts in your voice")
     .version(version)
     .showHelpAfterError()

@@ -1,4 +1,4 @@
-// `tract review` — display a stored draft and record accept/reject.
+// `postdiff review` — display a stored draft and record accept/reject.
 // Accept-only learning: accept-with-edit distills one global rule (LLM);
 // reject templates a rule from --reason (no LLM), then removes the version.
 

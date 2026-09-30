@@ -1,4 +1,4 @@
-// `tract voice` — manage the global voice profile (~/.tract/voice/).
+// `postdiff voice` — manage the global voice profile (~/.postdiff/voice/).
 
 import { join } from "node:path";
 import {
@@ -53,7 +53,7 @@ async function run(ctx: CommandContext): Promise<void> {
     const file = platformFromOpts(ctx);
     if (process.exitCode === 1) return;
     if (!file) {
-      console.error(`Specify a file: --voice, --blog, --x, or --linkedin. e.g. tract voice ${sub} --blog "<sample>"`);
+      console.error(`Specify a file: --voice, --blog, --x, or --linkedin. e.g. postdiff voice ${sub} --blog "<sample>"`);
       process.exitCode = 1;
       return;
     }
@@ -73,7 +73,7 @@ async function run(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  console.log("Usage: tract voice [add|create|remove|view] [--voice|--blog|--x|--linkedin] [\"<sample>\"]");
+  console.log("Usage: postdiff voice [add|create|remove|view] [--voice|--blog|--x|--linkedin] [\"<sample>\"]");
   process.exitCode = 1;
 }
 

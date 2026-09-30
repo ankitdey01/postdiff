@@ -1,12 +1,12 @@
 // Engine: commit context gathering + cleaning. No LLM here — output is the
 // ready-to-serve input for the generation slice (and for Jev debugging).
-// Saved per slug/sha under ~/.tract and reused: same sha => same context.
+// Saved per slug/sha under ~/.postdiff and reused: same sha => same context.
 
 import { join } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { getCommitPayload, getFileStatuses, getParentMessage, readFileAtCommit, resolveSha } from "../git/index.js";
-import { isIgnoredPath } from "../git/ignore.js";
-import { getRepoSlug, getTractHome } from "../store/index.js";
+import { getCommitPayload, getFileStatuses, getParentMessage, readFileAtCommit, resolveSha } from "./git.js";
+import { isIgnoredPath } from "./ignore.js";
+import { getRepoSlug, getTractHome } from "../store.js";
 
 /** Per-file content cap; larger files truncate with a marker. */
 export const MAX_FILE_CHARS = 12_000;

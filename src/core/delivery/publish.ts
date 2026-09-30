@@ -3,8 +3,8 @@
 // cli/ (same split as review: core judges, interfaces act).
 
 import type { Platform } from "../../shared/types.js";
-import { platformDraftFile } from "../generation/index.js";
-import { hashContent, readReviewState } from "../review/index.js";
+import { platformDraftFile } from "../generation/generator.js";
+import { hashContent, readReviewState } from "./review.js";
 
 export interface PublishReady {
   file: `${Platform}.md`;

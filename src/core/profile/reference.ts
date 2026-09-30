@@ -1,15 +1,15 @@
 // Reference examples: the author's real posts per platform. Generation studies
 // them and writes a similar variation for the new commit. V1: static files only.
-// fs logic lives in ../samplefile; this module preserves the public reference API.
+// fs logic lives in ./samplefile; this module preserves the public reference API.
 
+import { SAMPLE_SEPARATOR } from "./voice.js";
 import {
-  SAMPLE_SEPARATOR,
   ensureSampleFiles,
   readSampleFile,
   appendSampleEntry,
   overwriteSampleEntry,
   clearSampleFile,
-} from "../samplefile/index.js";
+} from "./samplefile.js";
 
 export { SAMPLE_SEPARATOR };
 

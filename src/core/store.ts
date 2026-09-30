@@ -1,14 +1,14 @@
-// Engine: global ~/.tract store. No repo-local .tract (locked Q7).
+// Engine: global ~/.postdiff store. No repo-local .postdiff (locked Q7).
 
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import type { Verdict } from "../../shared/types.js";
-import { ensureVoiceFiles } from "../voice/index.js";
-import { ensureReferenceFiles } from "../reference/index.js";
-import { ensurePreferenceFiles } from "../preferences/index.js";
+import type { Verdict } from "../shared/types.js";
+import { ensureVoiceFiles } from "./profile/voice.js";
+import { ensureReferenceFiles } from "./profile/reference.js";
+import { ensurePreferenceFiles } from "./profile/preferences.js";
 
 export interface TractConfig {
   jevModel: string;
@@ -23,7 +23,7 @@ export const DEFAULT_CONFIG: TractConfig = {
 };
 
 export function getTractHome(): string {
-  return join(homedir(), ".tract");
+  return join(homedir(), ".postdiff");
 }
 
 function writeDefaultConfig(path: string): Promise<void> {

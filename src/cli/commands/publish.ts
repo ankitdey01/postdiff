@@ -1,4 +1,4 @@
-// `tract publish` — copy an approved draft to the clipboard. Copy-only by
+// `postdiff publish` — copy an approved draft to the clipboard. Copy-only by
 // design (no platform APIs, no browser tabs in v1). Thin interface over the
 // core gate: all draft/review/hash decisions live in core/publish.
 

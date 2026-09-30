@@ -21,7 +21,7 @@ flowchart LR
             GEN["Generation\n(prompt + external LLM, provider TBD)"]
             VOICE["Voice Profile"]
             FEEDBACK["Feedback Store\nedit deltas / accept-reject"]
-            STORE[("Global Store ~/.tract\nvoice + drafts per repo/commit")]
+            STORE[("Global Store ~/.postdiff\nvoice + drafts per repo/commit")]
         end
     end
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// CLI entry point. Bootstraps (~/.tract, .env), then runs the program.
+// CLI entry point. Bootstraps (~/.postdiff, .env), then runs the program.
 // All env/console/process access lives in cli/ — never inside core/.
 
 import { readFile } from "node:fs/promises";
@@ -38,7 +38,7 @@ async function readVersion(): Promise<string> {
 async function main(): Promise<void> {
   const cwd = process.cwd();
 
-  // ~/.tract exists from the first tract invocation, whichever command it is.
+  // ~/.postdiff exists from the first postdiff invocation, whichever command it is.
   await ensureTractHome();
   await loadEnvFile(cwd);
 

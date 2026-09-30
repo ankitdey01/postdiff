@@ -60,7 +60,7 @@ export async function savePreferenceRule(platform: Platform, rule: string): Prom
   console.log(`platform rule already known — skipped`);
 }
 
-/** sha dir for a commit (default HEAD): ~/.tract/repos/<slug>/<sha>/ */
+/** sha dir for a commit (default HEAD): ~/.postdiff/repos/<slug>/<sha>/ */
 export async function resolveDraftDir(cwd: string, shaOrHead?: string): Promise<{ dir: string; sha: string }> {
   const sha = await resolveSha(cwd, shaOrHead ?? "HEAD");
   const slug = await getRepoSlug(cwd);

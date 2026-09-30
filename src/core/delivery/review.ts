@@ -7,8 +7,8 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import type { Platform } from "../../shared/types.js";
-import type { Generator } from "../generation/index.js";
-import { MAX_RULE_CHARS, truncateRule } from "../generation/index.js";
+import type { Generator } from "../generation/generator.js";
+import { MAX_RULE_CHARS, truncateRule } from "../generation/generator.js";
 
 export type ReviewStatus = "pending" | "accepted";
 

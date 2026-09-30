@@ -1,10 +1,12 @@
 // Public engine surface — the ONLY import surface for cli/extension.
 // Never deep-import core/* from outside; add new slices here as they land.
 
-export { resolveSha, getCommitPayload, truncateDiff, shapeDiffForJudge, splitDiffSections, MAX_BLOB_BYTES, getFileStatuses, getParentMessage, readFileAtCommit, isIgnoredPath } from "./core/git/index.js";
-export type { FileStatus, DiffSection } from "./core/git/index.js";
-export { JevSignificanceJudge, judgeSignificance, JevInclusionJudge, filterShapedDiff } from "./core/significance/index.js";
-export type { SignificanceInput, SignificanceResult, SignificanceJudge, InclusionJudge, FileInclusion, FilteredDiff } from "./core/significance/index.js";
+export { resolveSha, getCommitPayload, truncateDiff, shapeDiffForJudge, splitDiffSections, MAX_BLOB_BYTES, getFileStatuses, getParentMessage, readFileAtCommit, isIgnoredPath } from "./core/source/git.js";
+export type { FileStatus, DiffSection } from "./core/source/git.js";
+export { JevSignificanceJudge, judgeSignificance } from "./core/significance/gate.js";
+export type { SignificanceInput, SignificanceResult, SignificanceJudge } from "./core/significance/gate.js";
+export { JevInclusionJudge, filterShapedDiff } from "./core/significance/inclusion.js";
+export type { InclusionJudge, FileInclusion, FilteredDiff } from "./core/significance/inclusion.js";
 export {
   getTractHome,
   getRepoSlug,
@@ -13,10 +15,10 @@ export {
   saveMeta,
   hashDiff,
   DEFAULT_CONFIG,
-} from "./core/store/index.js";
-export type { TractConfig, DraftMeta } from "./core/store/index.js";
-export { ensureVoiceFiles, VOICE_FILES } from "./core/voice/index.js";
-export type { VoiceFile } from "./core/voice/index.js";
+} from "./core/store.js";
+export type { TractConfig, DraftMeta } from "./core/store.js";
+export { ensureVoiceFiles, VOICE_FILES } from "./core/profile/voice.js";
+export type { VoiceFile } from "./core/profile/voice.js";
 export {
   resolveVoiceFile,
   readVoiceFile,
@@ -24,12 +26,12 @@ export {
   overwriteVoiceSample,
   clearVoiceFile,
   SAMPLE_SEPARATOR,
-} from "./core/voice/index.js";
+} from "./core/profile/voice.js";
 export type { Platform, Verdict } from "./shared/types.js";
-export { REFERENCE_FILES } from "./core/reference/index.js";
-export type { ReferenceFile } from "./core/reference/index.js";
-export { PREFERENCE_FILES, MAX_PREFERENCE_RULES } from "./core/preferences/index.js";
-export type { PreferenceFile } from "./core/preferences/index.js";
+export { REFERENCE_FILES } from "./core/profile/reference.js";
+export type { ReferenceFile } from "./core/profile/reference.js";
+export { PREFERENCE_FILES, MAX_PREFERENCE_RULES } from "./core/profile/preferences.js";
+export type { PreferenceFile } from "./core/profile/preferences.js";
 export {
   resolvePreferenceFile,
   platformPreferenceFile,
@@ -39,7 +41,7 @@ export {
   appendPreferenceRule,
   overwritePreferenceFile,
   clearPreferenceFile,
-} from "./core/preferences/index.js";
+} from "./core/profile/preferences.js";
 export {
   resolveReferenceFile,
   platformReferenceFile,
@@ -48,12 +50,14 @@ export {
   appendReferenceExample,
   overwriteReferenceExample,
   clearReferenceFile,
-} from "./core/reference/index.js";
-export { gatherCommitContext, loadOrGatherCommitContext, saveCommitContext, loadCommitContext } from "./core/context/index.js";
-export { cleanText, MAX_FILE_CHARS, MAX_TOTAL_CHARS, CONTEXT_SCHEMA } from "./core/context/index.js";
-export type { CommitContext, ContextFile, OmitReason } from "./core/context/index.js";
-export { GroqGenerator, platformDraftFile, MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule, generatePipeline } from "./core/generation/index.js";
-export type { GenerateInput, DraftResult, Generator, GeneratorOptions, PipelineInput, PipelineEvent, PipelineResult } from "./core/generation/index.js";
+} from "./core/profile/reference.js";
+export { gatherCommitContext, loadOrGatherCommitContext, saveCommitContext, loadCommitContext } from "./core/source/context.js";
+export { cleanText, MAX_FILE_CHARS, MAX_TOTAL_CHARS, CONTEXT_SCHEMA } from "./core/source/context.js";
+export type { CommitContext, ContextFile, OmitReason } from "./core/source/context.js";
+export { GroqGenerator, platformDraftFile, MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule } from "./core/generation/generator.js";
+export type { GenerateInput, DraftResult, Generator, GeneratorOptions } from "./core/generation/generator.js";
+export { generatePipeline } from "./core/generation/pipeline.js";
+export type { PipelineInput, PipelineEvent, PipelineResult } from "./core/generation/pipeline.js";
 export {
   readReviewState,
   initReview,
@@ -61,10 +65,10 @@ export {
   hashContent,
   reviewFileName,
   rejectRuleFor,
-} from "./core/review/index.js";
-export type { ReviewStatus, ReviewVersion, ReviewState, VerdictInput, VerdictOutcome } from "./core/review/index.js";
-export { preparePublish } from "./core/publish/index.js";
-export type { PublishReady } from "./core/publish/index.js";
+} from "./core/delivery/review.js";
+export type { ReviewStatus, ReviewVersion, ReviewState, VerdictInput, VerdictOutcome } from "./core/delivery/review.js";
+export { preparePublish } from "./core/delivery/publish.js";
+export type { PublishReady } from "./core/delivery/publish.js";
 export { assemblePrompt } from "./core/generation/assemble.js";
 export { platformSpec, X_SPEC, LINKEDIN_SPEC, BLOG_SPEC } from "./core/generation/platforms.js";
 export type { PlatformSpec } from "./core/generation/platforms.js";
