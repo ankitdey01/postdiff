@@ -2,7 +2,7 @@
 
 Turns your git commits into ready-to-post content — blog, X, LinkedIn (YouTube script deferred to post-v1) — in your own voice.
 
-Early WIP, first commit. Nothing to install yet.
+CLI tool ships as `postdiff`. All slices implemented: context, generate, voice, review, reference, preferences, publish.
 
 ```mermaid
 flowchart LR
@@ -16,16 +16,17 @@ flowchart LR
         subgraph ENGINE["Content Engine (UI-agnostic)"]
             direction TB
             GITMOD["Diff + Commit Extraction"]
-            FILTER{"Significance Filter\nJev Noul judgment only\n(--force bypasses)"}
-            CTX["Context Builder\ndiff + README + voice profile"]
-            GEN["Generation\n(prompt + external LLM, provider TBD)"]
-            VOICE["Voice Profile"]
-            FEEDBACK["Feedback Store\nedit deltas / accept-reject"]
-            STORE[("Global Store ~/.postdiff\nvoice + drafts per repo/commit")]
+            FILTER{"Significance Filter\nStage 1: whole-commit Jev gate\nStage 2: per-file inclusion\n(--force bypasses)"}
+            CTX["Context Builder\ncommit msg + parent + shaped diff\n+ changed file contents"]
+            GEN["Generation\nGroq transport · openai/gpt-oss-20b\n+ browser search tool"]
+            VOICE["Voice Profile\nvoice.md + platform .md"]
+            REF["Reference + Preferences\nper-platform examples & rules"]
+            REVIEW["Review State\naccept / reject / edit → preference rules"]
+            STORE[("Global Store ~/.postdiff\nvoice + reference + preferences\n+ drafts per repo/commit")]
         end
     end
 
-    LLM["External LLM API\n(provider TBD)"]
+    LLM["Groq API\n(@ai-sdk/groq)"]
 
     subgraph PUBLISH["Publish (copy-only)"]
         COPY["Clipboard — copy approved draft\n(user pastes anywhere)"]
@@ -37,14 +38,17 @@ flowchart LR
     GITMOD --> FILTER
     FILTER -- "not significant" --> SKIP["Skip, log, wait for next trigger"]
     FILTER -- "significant" --> CTX
-    VOICE --> CTX
     CTX --> GEN
+    VOICE --> GEN
+    REF --> GEN
     GEN <--> LLM
     GEN --> CLIENTS
 
-    CLIENTS -- "user edits/approves draft" --> FEEDBACK
-    FEEDBACK --> STORE
+    CLIENTS -- "user reviews draft" --> REVIEW
+    REVIEW -- "accept-with-edit distills rule" --> REF
+    REVIEW --> STORE
     VOICE --> STORE
+    REF --> STORE
 
     CLIENTS --> COPY
 ```

@@ -105,7 +105,7 @@ export async function filterShapedDiff(
     });
 
   if (judgeable.length === 0) {
-    return { filtered: shapedDiff, thresholdUsed: start, keptFiles: 0, droppedFiles: 0, perFile: perFile(new Set(), new Map()) };
+    return { filtered: shapedDiff, thresholdUsed: null, keptFiles: 0, droppedFiles: 0, perFile: perFile(new Set(), new Map()) };
   }
   if (!opts.judge) throw new Error("No inclusion judge provided (set TYPESAFE_API_KEY to filter, or send the full diff)");
 

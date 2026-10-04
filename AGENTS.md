@@ -1,4 +1,4 @@
-# AGENTS.md — Tract
+# AGENTS.md — Postdiff
 
 The following instrucions and PRD.md doesnt solely represent the final product. You have complete right to cross question me and suggest me better workaround if needed and valid. Remember one thing, we dont need to build everything from scratch, thats not the point, there will be better already created specific tools and libraries for specific tasks that needs to be done. You should always find and suggest those to me. 
 Below is just a rough sketch of the overall product.
@@ -11,14 +11,14 @@ Don't overcomplicate, instead do smart engineering changes. Dont over engineer s
 
 ## Current state
 
-Scaffolded: TypeScript + Node CLI (`src/`, `tsconfig.json`, `npm run build`). Significance slice live (`postdiff diff`, `postdiff generate` with Jev gate). Voice, generation, publish slices still open. Test/eval harness deferred (PRD §14.9). Do not assume test/lint/CI commands exist.
+All seven CLI commands implemented: `postdiff context`, `postdiff generate`, `postdiff voice`, `postdiff review`, `postdiff reference`, `postdiff preferences`, `postdiff publish`. Significance (Jev gate + per-file inclusion filter), generation (Groq via Vercel AI SDK, model `openai/gpt-oss-20b` with browser search), review (accept/reject with LLM rule distillation), publish (clipboard copy-only). Test/eval harness deferred (PRD §14.9). Do not assume test/lint/CI commands exist.
 
-## Design flow (from PRD §8, implementation TBD)
+## Design flow (from PRD §8)
 
-Capability pipeline, in order: diff/commit extraction → significance filter → context building (diff + README + voice) → generation → human review → publish → feedback loop into voice profile.
+Capability pipeline, in order: diff/commit extraction → significance filter (Jev gate + per-file inclusion) → context building (commit message + parent + shaped diff + file contents; cached per sha) → generation (voice, reference, preferences loaded fresh per call) → human review → publish (copy-only) → feedback via preference rules.
 
 - Engine is UI-agnostic: interfaces call it, it never depends on them. Simplest terminal-native surface ships first; editor integration later.
-- LLM provider and storage are swappable behind interfaces (mock in tests). No provider or backend hardcoded. Secrets are passed into the engine as inputs, never read inside it.
+- LLM provider: Groq transport (`@ai-sdk/groq`) with `openai/gpt-oss-20b`; swappable via `config.json`. Secrets passed into the engine as inputs, never read inside it.
 - Coverage lives where the logic lives (significance, context, generation, voice/feedback).
 
 ## Build discipline (non-negotiable workflow)
@@ -41,6 +41,15 @@ Build one capability slice at a time, then stop. Verify it live with the user be
 - Significance uses TypeSafe Jev only — `bulk-classify` is NOT in the significance path (retired heuristic/cascade idea).
 - Before using vercel ai sdk, read the skills `ai-sdk` `SKILL.md`.
   - Vercel SDK: https://ai-sdk.dev/llms.txt
+
+
+## Environment variables
+
+Loaded from `cwd/.env` if not already set. No dotenv dependency — hand-rolled loader in `src/cli/main.ts`.
+
+- `TYPESAFE_API_KEY` — TypeSafe Jev API key for significance judgments
+- `GROQ_KEY` — Groq inference API key for generation
+- `TRACT_DEVTOOLS` — optional; enables Vercel AI SDK devtools telemetry
 
 ## Agent skills
 

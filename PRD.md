@@ -1,6 +1,6 @@
 # Tract — Product Requirements Document
 
-**Status:** Pre-release. This document is the single source of truth for product, design flow, and decisions made so far. Implementation stack is settled as TypeScript + Node (see `package.json`, `tsconfig.json`, `src/`); the LLM provider and storage are swappable behind interfaces (mocked in tests). Only genuinely open build-time choices (concrete provider, backend, test/eval harness) remain to be decided during build.
+**Status:** Pre-release. This document is the single source of truth for product, design flow, and decisions made so far. Implementation stack is TypeScript + Node (see `package.json`, `tsconfig.json`, `src/`); LLM provider is Groq transport with `openai/gpt-oss-20b`, swappable via config. CLI binary ships as `postdiff`.
 
 ## 1. Name & Positioning
 
@@ -45,12 +45,13 @@ Solo/indie developers building in public with an existing or growing social pres
 - Manual trigger command (exact syntax TBD)
 - Scheduled digest (future, not v1)
 
-### 7.2 Significance Filter (Jev-only — decided)
-- Single Jev Noul judgment (`is_significant`) over diff + commit-message state via `@typesafe-ai/sdk` (`jev-latest`). No heuristic pre-pass, no generic LLM prompt-parse step.
+### 7.2 Significance Filter (decided)
+- **Stage 1 — whole-commit gate:** Single Jev Noul judgment (`is_significant`) over diff + commit-message state via `@typesafe-ai/sdk` (`jev-latest`). No heuristic pre-pass, no generic LLM prompt-parse step.
 - State: `{ diff, commitMessage, filesChanged }`. `diff` is shaped before judging: noise paths (`.agents/`, `node_modules/`, `dist/`, lockfiles, `.env`) collapse to filename-only; full filenames still reach Jev via `filesChanged`. Shaping trims input only — it never decides significance. Question: `Is this change worth posting about?` with `true`/`false` criteria pinning "worth posting" vs. trivial/noise.
-- Pass (`noul >= threshold`, default 0.5, tunable after dogfooding) → proceed to context building + generation. Fail → stop, log, wait for next trigger.
+- Pass (`noul >= threshold`, default 0.5, tunable after dogfooding) → proceed. Fail → stop, log, wait for next trigger.
 - `postdiff generate --force` bypasses the judge entirely.
 - Timeouts/errors: SDK retry with backoff; on persistent failure log a warning + proceed as if `--force` (force-through). A Jev verdict of fail still stops — only errors force through, so a hung API never blocks real usage or a demo. Jev stays the sole significance decider.
+- **Stage 2 — per-file inclusion filter:** After the whole-commit gate passes, a second Jev judgment (`should_include_in_post`) runs over each file's diff section to trim the shaped diff to only files worth including in the post. Runs in batches of 30 files per call; threshold 0.5 with relaxation to 0.1 if all files are excluded. Error force-through: on failure, files are included rather than dropped.
 - Rehearsal note: for any live/demo use, test the actual diff being used ahead of time so the Jev verdict is already known, not discovered live.
 
 ### 7.3 Voice Profile (decided: global, paired)
@@ -66,10 +67,10 @@ Solo/indie developers building in public with an existing or growing social pres
 - **Cold-start problem, acknowledged but not fully solved:** a brand-new user with no past posts either has to paste several samples upfront (friction) or gets generic output until enough signal accumulates (mediocre first impression). For hackathon/demo purposes, resolved by pre-seeding real posts before demo day — not yet solved for a genuine first-time user in production.
 
 ### 7.4 Generation (decided)
-- Input: committed diff + commit context + README (where available) + paired voice profile (`voice.md` + platform file) + target platform
+- Input: committed diff + commit context + changed file contents + paired voice profile (`voice.md` + platform file) + reference examples + global preference rules + target platform
 - One platform per request via `postdiff generate [<sha>] [--force] [--blog|--x|--linkedin]` — no fan-out; each platform drafted separately on demand
-- Provider: Groq (BYOK key in `.env`) behind our own `Generator` interface, implemented with the Vercel AI SDK (`ai` + `@ai-sdk/groq`; model pinned in `config.json`). Single-stage: code-assembled prompt carries the full raw context — no prompt-builder model call.
-- Web enrichment: Groq browser search attached as an agent-decided tool (no flag, no extra key — billed as tokens on the same key). The prompt permits 0-2 searches; the model skips browsing when the context alone suffices. gpt-oss-only; changing `genModel` off gpt-oss silently drops search.
+- Provider: Groq transport (`@ai-sdk/groq`, BYOK key in `.env` as `GROQ_KEY`) behind our own `Generator` interface, implemented with the Vercel AI SDK (`ai` + `@ai-sdk/groq`). Default model `openai/gpt-oss-20b` (pinned in `~/.postdiff/config.json`). Single-stage: code-assembled prompt carries the full raw context — no prompt-builder model call. Accept-with-edit triggers a separate LLM call to distill a global preference rule.
+- Web enrichment: Groq browser search attached as a provider-executed tool (no flag, no extra key — billed as tokens on the same key). The model decides whether to search (0-2 calls). Non-gpt-oss models may not support browser search; a warning is emitted but the tool is still passed.
 - Blog format includes a configurable target word count; blog output is Markdown (links as `[text](url)`)
 
 ### 7.5 Review
@@ -80,17 +81,17 @@ Solo/indie developers building in public with an existing or growing social pres
 - `postdiff publish [--blog|--x|--linkedin] [sha]` (default HEAD) copies the accepted draft to the clipboard; the user pastes wherever they like. No intent URLs, no compose tabs, no OAuth in v1.
 - Gate: the stored draft's latest version must be `accepted` and hash-match the file — edited-after-accept refuses with "review --accept first". Nothing is recorded after copying; drafts + review verdicts already are the audit trail.
 
-## 8. Architecture (conceptual — implementation TBD)
+## 8. Architecture
 
 Pipeline, in order:
 
 1. Diff/commit extraction from the local git repo
-2. Significance filter (Jev Noul judgment only; `--force` bypasses)
+2. Significance filter — Stage 1: whole-commit Jev Noul gate (`--force` bypasses); Stage 2: per-file inclusion filter (trims diff to relevant files)
 3. Context building (commit message + parent + shaped diff + file contents only — no voice, reference, or preferences) — gathered once per sha, cached as `context.json` in `~/.postdiff/repos/<slug>/<sha>/`, reused by every later `generate`/`context` call for that sha. Voice, reference, and preference files are read fresh from `~/.postdiff` on every `generate` call, never cached in `context.json`
-4. Generation (prompt + external LLM, provider TBD)
-5. Human review (edit/approve/regenerate/reject — required before publish)
-6. Publish (browser-based; X intent vs. copy+open per §7.6)
-7. Feedback capture (edit deltas, accept/reject) feeding back into the voice profile
+4. Generation (Groq via Vercel AI SDK, model `openai/gpt-oss-20b` with optional browser search)
+5. Human review (edit/approve/regenerate/reject — required before publish; accept-with-edit distills a global preference rule via LLM)
+6. Publish (copy-only via clipboard per §7.6)
+7. Feedback: accept/reject verdicts + distilled preference rules persist learnings. Full feedback loop (edit deltas feeding voice profile) deferred to V2.
 
 Design principles (not tech choices):
 
@@ -113,7 +114,7 @@ TBD — to be decided during build. Constraints only:
 - `postdiff context [<sha>] [--json]` — generation-ready context inspector for a commit (replaces retired `postdiff diff`; no LLM, no `--staged` pre-commit preview in v1)
 - `postdiff generate [<sha>] [--force] [--blog|--x|--linkedin]` — Jev gate then drafts **one** requested platform; default `<sha>` = HEAD; `--force` skips the Jev gate
 - `postdiff voice [add|create|remove|view] [--blog|--x|--linkedin] ["<pasted string>"]` — `add` appends, `create` overwrites, `remove` clears, `view` shows all (flag filters to one); `voice.md` always pairs with the platform file
-- `postdiff review [<sha>] [--blog|--x|--linkedin] [--accept|--reject] [--reason "<text>"]` — displays the stored draft, records the verdict in `review-<platform>.json` (versions with content hashes + preference summaries; reject requires no reason, defaults recorded); verdicts bind to exact text, edits snapshot new versions
+- `postdiff review [<sha>] [--blog|--x|--linkedin] [--accept|--reject] [--reason "<text>"]` — displays the stored draft, records the verdict in `review-<platform>.json`. Accept stores the version; reject removes the version from history and converts the reason into a global preference rule via `rejectRuleFor()`. Accept-with-edit (content differs from generated) triggers an LLM call to distill a style preference. Verdicts bind to exact text, edits snapshot new versions.
 - `postdiff reference [add|create|remove|view] [--blog|--x|--linkedin] ["<post>"]` — real-post examples per platform (`~/.postdiff/reference/`); studied as style variations, never copied
 - `postdiff preferences [add|create|remove|view] [--blog|--x|--linkedin] ["<rule>"]` — global platform taste rules (`~/.postdiff/preferences/`); distilled automatically at changed-hash verdicts (dual-output preference call: commit preference + style-only global rule), curated by hand; cap 20/platform, oldest rotates; applied to every generation including first drafts
 - `postdiff publish [<sha>] [--blog|--x|--linkedin]` — copies the accepted draft to the clipboard (copy-only on every platform, per §7.6); default `<sha>` = HEAD; gate: latest version `accepted` + hash-matched to the file, else refuse with "review --accept first"
@@ -164,8 +165,8 @@ TBD — to be decided during build. Constraints only:
 
 ## 16. Open Questions
 
-- Voice profile scope: global per-user vs. per-project (Section 7.3)
+- ~~Voice profile scope: global per-user vs. per-project~~ → Resolved: global per-user (§7.3)
 - Real, verified statistics for the business/impact case are not yet sourced — competitor-published engagement stats must not be used as Tract's own supporting facts
 - Pricing model numbers not yet modeled against actual API costs
 - Team name/branding beyond the product name "Tract" not yet finalized
-- Implementation stack (language, runtime, project layout, LLM provider, storage mechanism, test runner) — all to be decided during build
+- ~~Implementation stack~~ → Resolved: TypeScript + Node, Groq via Vercel AI SDK (`@ai-sdk/groq`), model `openai/gpt-oss-20b`, `@typesafe-ai/sdk` for Jev, `commander` for CLI, `clipboardy` for publish
