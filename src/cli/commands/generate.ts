@@ -3,6 +3,7 @@
 import { generatePipeline } from "../../index.js";
 import type { CommandContext, TractCommand } from "../router.js";
 import { requestedPlatform, isDevtoolsEnabled, loadDevtoolsTelemetry, devtoolsHint } from "../helpers.js";
+import { resolveKeys } from "../keys.js";
 
 async function run(ctx: CommandContext): Promise<void> {
   const earlyPlatform = requestedPlatform(ctx.opts);
@@ -11,14 +12,15 @@ async function run(ctx: CommandContext): Promise<void> {
   const devtools = isDevtoolsEnabled(ctx.opts);
   const telemetry = await loadDevtoolsTelemetry(devtools);
 
+  const keys = resolveKeys();
   const result = await generatePipeline(
     {
       cwd: ctx.cwd,
       shaOrHead: ctx.positional[0] ?? "HEAD",
       platform: earlyPlatform,
       force: ctx.opts["force"] === true,
-      jevKey: process.env["TYPESAFE_API_KEY"] ?? "",
-      groqKey: process.env["GROQ_KEY"] ?? "",
+      jevKey: keys.typesafeKey,
+      groqKey: keys.groqKey,
       telemetry,
     },
     (chunk) => process.stdout.write(chunk),
@@ -37,7 +39,7 @@ async function run(ctx: CommandContext): Promise<void> {
       console.log(`Commit ${result.sha} has no diff — nothing to judge.`);
       return;
     case "missing-jev-key":
-      console.error("Missing TYPESAFE_API_KEY. Set it or re-run with --force.");
+      console.error("Missing TYPESAFE_API_KEY. Run `postdiff setup` or re-run with --force.");
       process.exitCode = 1;
       return;
     case "not-significant":
@@ -47,7 +49,7 @@ async function run(ctx: CommandContext): Promise<void> {
       console.log("No platform requested — add --blog, --x, or --linkedin to draft.");
       return;
     case "missing-groq-key":
-      console.error("Missing GROQ_KEY. Add it to .env to draft.");
+      console.error("Missing GROQ_KEY. Run `postdiff setup` to save it.");
       process.exitCode = 1;
       return;
     case "filter-empty":

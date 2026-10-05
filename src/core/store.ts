@@ -10,16 +10,32 @@ import { ensureVoiceFiles } from "./profile/voice.js";
 import { ensureReferenceFiles } from "./profile/reference.js";
 import { ensurePreferenceFiles } from "./profile/preferences.js";
 
-export interface TractConfig {
+export interface TractUser {
+  name: string;
+}
+
+export interface TractModels {
   jevModel: string;
   threshold: number;
   genModel: string;
 }
 
+export interface TractConfig {
+  version: number;
+  user: TractUser;
+  models: TractModels;
+}
+
+export const CONFIG_VERSION = 1;
+
 export const DEFAULT_CONFIG: TractConfig = {
-  jevModel: "jev-latest",
-  threshold: 0.5,
-  genModel: "openai/gpt-oss-20b",
+  version: CONFIG_VERSION,
+  user: { name: "" },
+  models: {
+    jevModel: "jev-latest",
+    threshold: 0.5,
+    genModel: "openai/gpt-oss-20b",
+  },
 };
 
 export function getTractHome(): string {
@@ -28,6 +44,16 @@ export function getTractHome(): string {
 
 function writeDefaultConfig(path: string): Promise<void> {
   return writeFile(path, JSON.stringify(DEFAULT_CONFIG, null, 2) + "\n", "utf8");
+}
+
+/** Path to the global config.json — the first-run setup sentinel. */
+export function getConfigPath(): string {
+  return join(getTractHome(), "config.json");
+}
+
+/** Path to the global env file where setup stores API keys. */
+export function getEnvPath(): string {
+  return join(getTractHome(), ".env");
 }
 
 function sha1Hex(s: string, len: number): string {
@@ -72,23 +98,40 @@ export async function ensureTractHome(): Promise<string> {
 export async function loadConfig(): Promise<TractConfig> {
   const home = await ensureTractHome();
   const path = join(home, "config.json");
-  let parsed: Partial<TractConfig> = {};
+  let parsed: Partial<TractConfig> & Record<string, unknown> = {};
   let corruptOrMissing = false;
   try {
-    parsed = JSON.parse(await readFile(path, "utf8")) as Partial<TractConfig>;
+    parsed = JSON.parse(await readFile(path, "utf8")) as Partial<TractConfig> & Record<string, unknown>;
   } catch {
     // Missing or corrupt — fall through to defaults and rewrite.
     corruptOrMissing = true;
   }
+
+  // Legacy flat shape (pre-v1: { jevModel, threshold, genModel }) lifts into `models`.
+  const legacy = parsed as { jevModel?: unknown; threshold?: unknown; genModel?: unknown };
+  const hasLegacy = !parsed.models && (typeof legacy.jevModel === "string" || typeof legacy.threshold === "number" || typeof legacy.genModel === "string");
+  const rawModels = (parsed.models ?? legacy) as Partial<TractModels>;
+  const rawUser: Partial<TractUser> = parsed.user ?? {};
+
   const merged: TractConfig = {
-    jevModel: typeof parsed.jevModel === "string" ? parsed.jevModel : DEFAULT_CONFIG.jevModel,
-    threshold: typeof parsed.threshold === "number" ? parsed.threshold : DEFAULT_CONFIG.threshold,
-    genModel: typeof parsed.genModel === "string" ? parsed.genModel : DEFAULT_CONFIG.genModel,
+    version: CONFIG_VERSION,
+    user: {
+      name: typeof rawUser.name === "string" ? rawUser.name : "",
+    },
+    models: {
+      jevModel: typeof rawModels.jevModel === "string" ? rawModels.jevModel : DEFAULT_CONFIG.models.jevModel,
+      threshold: typeof rawModels.threshold === "number" ? rawModels.threshold : DEFAULT_CONFIG.models.threshold,
+      genModel: typeof rawModels.genModel === "string" ? rawModels.genModel : DEFAULT_CONFIG.models.genModel,
+    },
   };
-  // Write only when backfilling missing values or recovering from corruption;
-  // unchanged valid configs are left alone.
+  // Write only when missing/corrupt, migrating a legacy shape, or backfilling
+  // fields; unchanged valid configs are left alone.
   const needsWrite =
-    corruptOrMissing || parsed.jevModel !== merged.jevModel || parsed.threshold !== merged.threshold || parsed.genModel !== merged.genModel;
+    corruptOrMissing ||
+    hasLegacy ||
+    parsed.version !== merged.version ||
+    JSON.stringify(parsed.user) !== JSON.stringify(merged.user) ||
+    JSON.stringify(parsed.models) !== JSON.stringify(merged.models);
   if (needsWrite) {
     // Atomic replace so concurrent loads never observe a partial write.
     const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;

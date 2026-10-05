@@ -10,6 +10,7 @@ import { command as preferencesCommand } from "./commands/preferences.js";
 import { command as publishCommand } from "./commands/publish.js";
 import { command as referenceCommand } from "./commands/reference.js";
 import { command as reviewCommand } from "./commands/review.js";
+import { command as setupCommand } from "./commands/setup.js";
 import { command as voiceCommand } from "./commands/voice.js";
 
 export interface CommandContext {
@@ -55,7 +56,7 @@ function register(program: Command, cwd: string, cmd: TractCommand): void {
   });
 }
 
-const ALL_COMMANDS = [contextCommand, generateCommand, preferencesCommand, publishCommand, referenceCommand, reviewCommand, voiceCommand];
+const ALL_COMMANDS = [contextCommand, generateCommand, preferencesCommand, publishCommand, referenceCommand, reviewCommand, setupCommand, voiceCommand];
 
 /** Builds the program and parses argv. Commands set process.exitCode themselves. */
 export async function runProgram(argv: string[], cwd: string, version: string): Promise<void> {
@@ -73,7 +74,7 @@ export async function runProgram(argv: string[], cwd: string, version: string): 
       }
       program.outputHelp();
     })
-    .addHelpText("after", "Env: TYPESAFE_API_KEY + GROQ_KEY (or cwd/.env); GROQ_KEY required for drafts unless the gate stops first.");
+    .addHelpText("after", "Env: TYPESAFE_API_KEY + GROQ_KEY (env, cwd/.env, or ~/.postdiff/.env — run `postdiff setup`).");
 
   for (const cmd of ALL_COMMANDS) register(program, cwd, cmd);
 

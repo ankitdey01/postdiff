@@ -12,6 +12,7 @@ import {
   hashContent,
 } from "../../index.js";
 import { resolveDraftDir, readDraft, requestedPlatform, savePreferenceRule, isDevtoolsEnabled, loadDevtoolsTelemetry, devtoolsHint } from "../helpers.js";
+import { resolveKeys } from "../keys.js";
 import type { CommandContext, TractCommand } from "../router.js";
 import type { ReviewState } from "../../index.js";
 
@@ -75,9 +76,9 @@ async function run(ctx: CommandContext): Promise<void> {
   // is required only then.
   const latest = state.versions[state.versions.length - 1];
   const moved = latest ? hashContent(draftBody) !== latest.hash : true;
-  const groqKey = process.env["GROQ_KEY"] ?? "";
+  const groqKey = resolveKeys().groqKey;
   if (moved && !groqKey) {
-    console.error("Missing GROQ_KEY. Add it to .env so the accept rule can be distilled (or revert your edit first).");
+    console.error("Missing GROQ_KEY. Run `postdiff setup` (or revert your edit first).");
     process.exitCode = 1;
     return;
   }
@@ -90,7 +91,7 @@ async function run(ctx: CommandContext): Promise<void> {
     fileContent: draftBody,
     accept: true,
     reason,
-    summarizer: new GroqGenerator(groqKey, config.genModel, { telemetry }),
+    summarizer: new GroqGenerator(groqKey, config.models.genModel, { telemetry }),
   });
   if (outcome.kind !== "accepted") return;
   if (devtools && outcome.snapshot) console.log(devtoolsHint());

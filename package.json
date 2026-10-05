@@ -1,6 +1,6 @@
 {
     "name": "postdiff",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "description": "A engine to turn commits into articles and blogs",
     "homepage": "https://github.com/ankitdey01/postdiff#readme",
     "bugs": {
@@ -25,6 +25,7 @@
     "dependencies": {
         "@ai-sdk/devtools": "^1.0.24",
         "@ai-sdk/groq": "^4.0.46",
+        "@clack/prompts": "^1.8.1",
         "@typesafe-ai/sdk": "latest",
         "ai": "^7.0.107",
         "clipboardy": "^5.3.2",

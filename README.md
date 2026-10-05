@@ -4,6 +4,16 @@ Turns your git commits into ready-to-post content — blog, X, LinkedIn (YouTube
 
 CLI tool ships as `postdiff`. All slices implemented: context, generate, voice, review, reference, preferences, publish.
 
+## Install & setup
+
+```bash
+npm i -g postdiff
+```
+
+First `postdiff generate` (or `review`) walks you through setup: your name, a [Jev/TypeSafe key](https://console.typesafe.ai/keys), a [Groq key](https://console.groq.com/keys) — both validated live — and optional voice/reference markdown. Or run `postdiff setup` explicitly (also for updates).
+
+Where things live: name → `~/.postdiff/config.json`; API keys → `~/.postdiff/.env` (precedence: real env > `cwd/.env` > `~/.postdiff/.env`); voice/reference/preferences → `~/.postdiff/`. Keys are never written to `config.json`.
+
 ```mermaid
 flowchart LR
     GITREPO[(Local Git Repo)]

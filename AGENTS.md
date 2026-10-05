@@ -38,6 +38,7 @@ Build one capability slice at a time, then stop. Verify it live with the user be
   - TypeSafe: https://docs.typesafe.ai/llms.txt
   - classifier.dev: https://classifier.dev/llms.txt
   - AI SDK: https://ai-sdk.dev/llms.txt (never write AI SDK code from memory; verify against installed `node_modules/ai` docs + typechecker)
+  - Bombshell/Clack: https://bomb.sh/docs/llms.txt (for `@clack/prompts` and terminal UI components)
 - Significance uses TypeSafe Jev only — `bulk-classify` is NOT in the significance path (retired heuristic/cascade idea).
 - Before using vercel ai sdk, read the skills `ai-sdk` `SKILL.md`.
   - Vercel SDK: https://ai-sdk.dev/llms.txt

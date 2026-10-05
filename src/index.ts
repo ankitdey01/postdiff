@@ -9,14 +9,19 @@ export { JevInclusionJudge, filterShapedDiff } from "./core/significance/inclusi
 export type { InclusionJudge, FileInclusion, FilteredDiff } from "./core/significance/inclusion.js";
 export {
   getTractHome,
+  getConfigPath,
+  getEnvPath,
   getRepoSlug,
   ensureTractHome,
   loadConfig,
   saveMeta,
   hashDiff,
   DEFAULT_CONFIG,
+  CONFIG_VERSION,
 } from "./core/store.js";
-export type { TractConfig, DraftMeta } from "./core/store.js";
+export type { TractConfig, TractUser, TractModels, DraftMeta } from "./core/store.js";
+export { applySetup, pingTypesafeKey, pingGroqKey } from "./core/setup.js";
+export type { SetupAnswers, SetupResult } from "./core/setup.js";
 export { ensureVoiceFiles, VOICE_FILES } from "./core/profile/voice.js";
 export type { VoiceFile } from "./core/profile/voice.js";
 export {

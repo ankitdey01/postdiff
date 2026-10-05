@@ -40,6 +40,13 @@ Solo/indie developers building in public with an existing or growing social pres
 
 ## 7. Core Features
 
+### 7.0 First-run setup (decided)
+- **Trigger:** when `~/.postdiff/config.json` does not exist and the invoked command needs API keys (`generate`, `review`), the CLI runs an interactive setup wizard first — once, before `ensureTractHome()` writes the skeleton. `--help`, `-h`, and every other command never hijack; non-TTY runs skip the wizard and surface normal missing-key errors. The wizard also exists as an explicit `postdiff setup` command for new installs and updates (pre-fills name, "enter to keep current" keys).
+- **Prompts (clack `@clack/prompts`):** required `name` (cannot be skipped; signs drafts) → `TYPESAFE_API_KEY` (Jev; link https://console.typesafe.ai/keys) → `GROQ_KEY` (link https://console.groq.com/keys), both **masked password prompts validated live** with one minimal API call each; bad key → error + re-prompt loop → optional multi-line `voice.md` paste (clack `multiline`; empty submit skips) and one optional reference example with a platform picker (reference files are per-platform; no `reference.md` concept). Preferences are not asked — they are LLM-distilled.
+- **Persistence (all-or-nothing):** nothing hits disk until every step completes; cancel mid-way writes nothing. On completion: restructured `config.json` (`{ version, user: { name }, models: { jevModel, threshold, genModel } }`; legacy flat shape migrates in place), keys into `~/.postdiff/.env` (mode 0600, merge-keeps unrelated keys) — **never into config.json** (§8 rule intact) — and optional voice/reference content into the existing profile files.
+- **Key resolution (single point, cli-only):** real env > `cwd/.env` > `~/.postdiff/.env`. `generate`/`review` no longer read `process.env` directly.
+- **Publishing:** package ships at 0.x with `bin: postdiff`; install is `npm i -g postdiff` (plain `npm i postdiff` does not put the binary on PATH).
+
 ### 7.1 Trigger Layer
 - Git post-commit hook
 - Manual trigger command (exact syntax TBD)

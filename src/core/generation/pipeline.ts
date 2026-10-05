@@ -91,8 +91,7 @@ export async function generatePipeline(
     return { status: "missing-jev-key" };
   }
   const sigResult = await judgeSignificance(
-    { diff: context.shapedDiff, commitMessage: context.commitMessage, filesChanged: context.filesChanged },
-    { threshold: config.threshold, force: input.force, judge: input.jevKey ? new JevSignificanceJudge(input.jevKey, config.jevModel) : undefined },
+    { diff: context.shapedDiff, commitMessage: context.commitMessage, filesChanged: context.filesChanged },      { threshold: config.models.threshold, force: input.force, judge: input.jevKey ? new JevSignificanceJudge(input.jevKey, config.models.jevModel) : undefined },
   );
 
   const slug = await getRepoSlug(input.cwd);
@@ -104,7 +103,7 @@ export async function generatePipeline(
     verdict: sigResult.verdict,
     forced: sigResult.forced,
     forcedReason: sigResult.forcedReason,
-    model: config.jevModel,
+    model: config.models.jevModel,
     includeThreshold: null,
     keptFiles: 0,
     droppedFiles: 0,
@@ -131,8 +130,8 @@ export async function generatePipeline(
 
   // 4. Load voice, reference, preferences, previous review
   const home = getTractHome();
-  if (!config.genModel.includes("gpt-oss")) {
-    emit({ kind: "gen-model-warning", message: `warning: genModel "${config.genModel}" is not gpt-oss — browser search is silently inactive.` });
+  if (!config.models.genModel.includes("gpt-oss")) {
+    emit({ kind: "gen-model-warning", message: `warning: genModel "${config.models.genModel}" is not gpt-oss — browser search is silently inactive.` });
   }
   const [voiceDefault, voicePlatform, prevReview, globalRulesRaw, reference] = await Promise.all([
     readVoiceFile(join(home, "voice"), "voice.md"),
@@ -153,7 +152,7 @@ export async function generatePipeline(
     emit({ kind: "filter-cached", message: `filter: cached (${genDiff.length} chars)` });
   } else if (input.jevKey) {
     const inclusion = await filterShapedDiff(context.shapedDiff, {
-      judge: new JevInclusionJudge(input.jevKey, config.jevModel),
+      judge: new JevInclusionJudge(input.jevKey, config.models.jevModel),
     });
     if (inclusion.forcedReason) {
       emit({ kind: "filter-ran", message: `warning: ${inclusion.forcedReason}` });
@@ -182,7 +181,7 @@ export async function generatePipeline(
   const genContext = { ...context, shapedDiff: genDiff };
   emit({ kind: "drafting", message: `drafting ${platform} (streaming) —` });
   const opts: GeneratorOptions = input.telemetry.length > 0 ? { telemetry: input.telemetry } : {};
-  const draft = await new GroqGenerator(input.groqKey, config.genModel, opts).generateStream(
+  const draft = await new GroqGenerator(input.groqKey, config.models.genModel, opts).generateStream(
     { platform, context: genContext, voiceDefault, voicePlatform, reference, globalPreferences },
     onChunk,
   );

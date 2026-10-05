@@ -1,26 +1,34 @@
 #!/usr/bin/env node
-// CLI entry point. Bootstraps (~/.postdiff, .env), then runs the program.
-// All env/console/process access lives in cli/ — never inside core/.
+// CLI entry point. First-run setup check, then bootstrap (~/.postdiff, .env),
+// then runs the program. All env/console/process access lives in cli/ — never
+// inside core/.
 
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ensureTractHome } from "../index.js";
+import { ensureTractHome, getConfigPath } from "../index.js";
 import { runProgram } from "./router.js";
+import { runSetupWizard } from "./commands/setup.js";
+import { bootstrapEnv } from "./keys.js";
 
-/** Loads known keys from cwd/.env if not already set. No early return: each key is independent. */
-async function loadEnvFile(cwd: string): Promise<void> {
-  let raw: string;
+/**
+ * First-run sentinel: config.json missing + a command that needs API keys +
+ * an interactive terminal → run the setup wizard before anything else.
+ * `--help`/`-h` and every other command never hijack. Nothing is written on
+ * cancel; the command itself then surfaces the missing-key error.
+ */
+async function maybeFirstRunSetup(argv: string[]): Promise<void> {
+  const invoked = argv[2] ?? "";
+  if (invoked !== "generate" && invoked !== "review") return;
+  if (argv.includes("--help") || argv.includes("-h")) return;
+  if (!process.stdout.isTTY) return;
   try {
-    raw = await readFile(join(cwd, ".env"), "utf8");
+    await stat(getConfigPath());
+    return; // config exists — setup already done
   } catch {
-    return;
+    // No config.json → first run.
   }
-  for (const key of ["TYPESAFE_API_KEY", "GROQ_KEY", "TRACT_DEVTOOLS"]) {
-    if (process.env[key]) continue;
-    const m = raw.match(new RegExp(`^\\s*(?:export\\s+)?${key}\\s*=\\s*["']?([^"'\\r\\n]+)["']?\\s*$`, "m"));
-    if (m) process.env[key] = m[1].trim();
-  }
+  await runSetupWizard();
 }
 
 async function readVersion(): Promise<string> {
@@ -38,9 +46,11 @@ async function readVersion(): Promise<string> {
 async function main(): Promise<void> {
   const cwd = process.cwd();
 
-  // ~/.postdiff exists from the first postdiff invocation, whichever command it is.
+  // Keys first: the first-run wizard reads them via resolveKeys(), and
+  // ensureTractHome() would create config.json and defeat the first-run check.
+  await bootstrapEnv(cwd);
+  await maybeFirstRunSetup(process.argv);
   await ensureTractHome();
-  await loadEnvFile(cwd);
 
   await runProgram(process.argv, cwd, await readVersion());
 }
