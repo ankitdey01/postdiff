@@ -1,5 +1,5 @@
-// Prompt assembly: deterministic. Template + CommitContext + paired voice.
-// No model call here — single-stage generation carries the full raw context.
+// Prompt assembly: deterministic. Template + cached change brief + paired voice.
+// No model call here — the writer renders from the brief, never the raw diff.
 
 import type { CommitContext } from "../source/context.js";
 import type { Platform } from "../../shared/types.js";
@@ -11,33 +11,13 @@ export interface AssembledPrompt {
   prompt: string;
 }
 
-/** File-content budget for one prompt (diff itself is always whole). */
-export const MAX_PROMPT_CONTENT_CHARS = 8_000;
-
-function renderFiles(c: CommitContext, budget: number = MAX_PROMPT_CONTENT_CHARS): string {
-  const parts: string[] = [];
-  let spent = 0;
-  for (const f of c.files) {
-    const label = f.previousPath ? `${f.status} ${f.previousPath} -> ${f.path}` : `${f.status} ${f.path}`;
-    if (!f.included) {
-      parts.push(`- ${label} (content omitted: ${f.omittedReason})`);
-      continue;
-    }
-    const remaining = budget - spent;
-    if (remaining <= 0) {
-      parts.push(`- ${label} (content omitted: budget)`);
-      continue;
-    }
-    let content = f.content ?? "";
-    let note = `${f.chars} chars${f.truncated ? ", truncated" : ""}`;
-    if (content.length > remaining) {
-      content = content.slice(0, remaining) + "\n... [content cut: prompt budget]";
-      note = "cut: prompt budget";
-    }
-    spent += content.length;
-    parts.push(`- ${label} (${note}):\n${content}`);
-  }
-  return parts.join("\n\n");
+function renderFiles(c: CommitContext): string {
+  return c.files
+    .map((f) => {
+      const label = f.previousPath ? `${f.status} ${f.previousPath} -> ${f.path}` : `${f.status} ${f.path}`;
+      return `- ${label}`;
+    })
+    .join("\n");
 }
 
 export function assemblePrompt(
@@ -46,7 +26,8 @@ export function assemblePrompt(
   voiceDefault: string,
   voicePlatform: string,
   reference: string,
-  globalPreferences: string[]
+  globalPreferences: string[],
+  opts: { webSearch?: boolean; readme?: string | null; summary: string },
 ): AssembledPrompt {
   const spec = platformSpec(platform);
   const system = [
@@ -59,25 +40,31 @@ export function assemblePrompt(
     voicePlatform.trim() || "(no platform voice samples yet)",
   ].join("\n");
 
+  const readme = opts?.readme?.trim() ? opts.readme.trim() : null;
   const prompt = [
-    `Write one ${platform} draft about the commit below. Max ${spec.limit}. ${spec.formatNotes}`,
+    `Write one ${platform} draft about the change below, as the author in first person (I/we, past tense for what was built).`,
+    `Max ${spec.limit}. ${spec.formatNotes}`,
     "",
     `Commit: ${context.sha.slice(0, 8)}`,
     `Message: ${context.commitMessage || "(empty)"}`,
     context.previousCommitMessage ? `Previous commit message: ${context.previousCommitMessage.split("\n")[0]}` : "Previous commit: none (root commit).",
     "",
-    "Diff:",
-    context.shapedDiff || "(empty diff)",
+    ...(readme ? ["Project context (README.md):", readme, ""] : []),
+    "Change brief (the full factual record — ground every claim here, never invent beyond it):",
+    opts.summary || "(empty brief)",
     "",
     "Changed files:",
     renderFiles(context),
     "",
-    "Platform taste rules (learned across all commits — always apply):",
+    "Hard constraints from the author (previously rejected output taught these — must follow; on any conflict with voice samples above, these win):",
     globalPreferences.length > 0 ? globalPreferences.map((p, i) => `${i + 1}. ${p}`).join("\n") : "(none yet)",
     "",
     REFERENCE_INSTRUCTION,
     reference.trim() || "(no reference examples yet)",
-    SEARCH_INSTRUCTION,
+    // Only mention browser_search when the tool is actually attached (--web
+    // + supported provider/model). Otherwise the model would be instructed
+    // to call a tool that doesn't exist.
+    ...(opts?.webSearch ? [SEARCH_INSTRUCTION] : []),
   ].join("\n");
 
   return { system, prompt };

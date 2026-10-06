@@ -1,13 +1,14 @@
-// Engine: full generate pipeline — context → significance → filter → draft →
-// persist → review init. Orchestration only; the model wrapper lives in
+// Engine: full generate pipeline — context → significance → filter → summary
+// → draft → persist → review init. Orchestration only; the model wrapper lives in
 // generator.ts. UI-agnostic: no stdout, no process.exitCode. Emits structured
 // events via `onEvent` and streaming text via `onChunk`; returns a
 // discriminated result the caller maps to its own output surface.
 
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { loadOrGatherCommitContext, saveCommitContext } from "../source/context.js";
-import { getRepoSlug, getTractHome, loadConfig, saveMeta, hashDiff, type DraftMeta } from "../store.js";
+import { loadOrGatherCommitContext, saveCommitContext, cleanText } from "../source/context.js";
+import { readFileAtCommit } from "../source/git.js";
+import { getRepoSlug, getPostdiffHome, loadConfig, saveMeta, hashDiff, type DraftMeta } from "../store.js";
 import {
   JevSignificanceJudge,
   judgeSignificance,
@@ -18,7 +19,9 @@ import { readVoiceFile } from "../profile/voice.js";
 import { readReferenceFile, platformReferenceFile } from "../profile/reference.js";
 import { readPreferenceFile, splitPreferenceRules, platformPreferenceFile } from "../profile/preferences.js";
 import { readReviewState, initReview } from "../delivery/review.js";
-import { GroqGenerator, platformDraftFile } from "./generator.js";
+import { SdkGenerator, platformDraftFile } from "./generator.js";
+import { getProviderSpec } from "./providers.js";
+import { MIN_SUMMARY_CHARS, SUMMARY_SCHEMA, hashSummaryInput, loadSummary, renderSummary, saveSummary } from "../summary/summary.js";
 import type { DraftResult, GeneratorOptions } from "./generator.js";
 import type { Platform } from "../../shared/types.js";
 import type { Telemetry } from "ai";
@@ -29,8 +32,13 @@ export interface PipelineInput {
   shaOrHead: string;
   platform: Platform | null;
   force: boolean;
+  /** Opt-in web search (--web). Off = prompt and tool stay search-free. */
+  web: boolean;
+  /** Rebuild the cached change brief even on cache hit (--fresh). */
+  fresh: boolean;
   jevKey: string;
-  groqKey: string;
+  /** Resolved provider API keys, keyed by env var name (GROQ_KEY, OPENAI_API_KEY, …). */
+  providerKeys: Record<string, string>;
   /** Telemetry integrations (DevTools etc.). Empty = off. */
   telemetry: Telemetry[];
 }
@@ -46,6 +54,9 @@ export interface PipelineEvent {
     | "filter-skipped"
     | "preferences-loaded"
     | "gen-model-warning"
+    | "summary-building"
+    | "summary-cached"
+    | "summary-built"
     | "drafting"
     | "review-superseded";
   message: string;
@@ -58,13 +69,16 @@ export type PipelineResult =
   | { status: "missing-jev-key" }
   | { status: "not-significant"; significance: SignificanceResult; sha: string; metaDir: string }
   | { status: "no-platform"; significance: SignificanceResult; sha: string; metaDir: string }
-  | { status: "missing-groq-key" }
+  | { status: "missing-gen-key"; provider: string; envKey: string }
+  | { status: "unknown-provider"; provider: string }
   | { status: "filter-empty"; sha: string; metaDir: string }
+  | { status: "summary-failed"; reason: string; sha: string; metaDir: string }
   | { status: "empty-draft"; draft: DraftResult; metaDir: string; genPayloadPath: string }
   | { status: "ok"; draft: DraftResult; draftPath: string; metaDir: string; prevReviewSuperseded: boolean };
 
 /**
- * Full generate pipeline: context → Jev significance → inclusion filter → LLM draft → persist → review init.
+ * Full generate pipeline: context → Jev significance → inclusion filter →
+ * change-brief summary → summary-only LLM draft → persist → review init.
  *
  * UI-agnostic: no stdout, no process.exitCode, no chalk. Emits structured
  * events via `onEvent` and streaming text via `onChunk`; returns a
@@ -124,28 +138,45 @@ export async function generatePipeline(
   }
   const platform = input.platform;
 
-  if (!input.groqKey) {
-    return { status: "missing-groq-key" };
+  // 4. Resolve the configured provider and its key
+  const providerId = config.models.provider;
+  const providerSpec = getProviderSpec(providerId);
+  if (!providerSpec) {
+    return { status: "unknown-provider", provider: providerId };
+  }
+  const genKey = input.providerKeys[providerSpec.envKey] ?? "";
+  if (!genKey) {
+    return { status: "missing-gen-key", provider: providerId, envKey: providerSpec.envKey };
   }
 
-  // 4. Load voice, reference, preferences, previous review
-  const home = getTractHome();
-  if (!config.models.genModel.includes("gpt-oss")) {
-    emit({ kind: "gen-model-warning", message: `warning: genModel "${config.models.genModel}" is not gpt-oss — browser search is silently inactive.` });
+  // 5. Load voice, reference, preferences, previous review
+  const home = getPostdiffHome();
+  // Web search is strictly opt-in (--web). Off by default: no tool, no
+  // search instruction in the prompt. Requested but unsupported → visible
+  // warning, draft without it. Requested and supported → tool attached; a
+  // mid-call web failure retries tool-free (warned at the end, never fatal).
+  const webSupported = providerSpec.supportsWebSearch(config.models.genModel);
+  const webActive = input.web && webSupported;
+  if (input.web && !webSupported) {
+    emit({
+      kind: "gen-model-warning",
+      message: `warning: --web requested but web search is unavailable for ${providerId}/${config.models.genModel} — drafting without it.`,
+    });
   }
-  const [voiceDefault, voicePlatform, prevReview, globalRulesRaw, reference] = await Promise.all([
+  const [voiceDefault, voicePlatform, prevReview, globalRulesRaw, reference, readme] = await Promise.all([
     readVoiceFile(join(home, "voice"), "voice.md"),
     readVoiceFile(join(home, "voice"), platformDraftFile(platform)),
     readReviewState(dir, platform),
     readPreferenceFile(join(home, "preferences"), platformPreferenceFile(platform)),
     readReferenceFile(join(home, "reference"), platformReferenceFile(platform)),
+    loadReadmeAtCommit(input.cwd, context.sha),
   ]);
   const globalPreferences = splitPreferenceRules(globalRulesRaw);
   if (globalPreferences.length > 0) {
     emit({ kind: "preferences-loaded", message: `applying ${globalPreferences.length} platform taste rule(s).` });
   }
 
-  // 5. Stage 2 inclusion filter
+  // 6. Stage 2 inclusion filter
   let genDiff = context.shapedDiff;
   if (context.filteredShapedDiff !== null) {
     genDiff = context.filteredShapedDiff;
@@ -177,19 +208,77 @@ export async function generatePipeline(
     emit({ kind: "filter-skipped", message: "(no TYPESAFE_API_KEY — skipping per-file filter, full diff to generation)" });
   }
 
-  // 6. Generate draft
-  const genContext = { ...context, shapedDiff: genDiff };
-  emit({ kind: "drafting", message: `drafting ${platform} (streaming) —` });
-  const opts: GeneratorOptions = input.telemetry.length > 0 ? { telemetry: input.telemetry } : {};
-  const draft = await new GroqGenerator(input.groqKey, config.models.genModel, opts).generateStream(
-    { platform, context: genContext, voiceDefault, voicePlatform, reference, globalPreferences },
+  // 7. Resolve the cached change brief (built once per sha, always used).
+  // Writer never sees the raw diff — only this brief.
+  const generator = new SdkGenerator(providerId, genKey, config.models.genModel, {
+    ...(input.telemetry.length > 0 ? { telemetry: input.telemetry } : {}),
+  });
+  const summaryInputHash = hashSummaryInput({ diff: genDiff, commitMessage: context.commitMessage, readme });
+  let brief: string;
+  try {
+    if (!input.fresh) {
+      const cached = await loadSummary(home, slug, context.sha);
+      if (cached && cached.inputHash === summaryInputHash) {
+        brief = renderSummary(cached.summary);
+        emit({ kind: "summary-cached", message: `summary: cached (${brief.length} chars)` });
+      } else {
+        brief = await buildAndSaveBrief(cached ? true : false);
+      }
+    } else {
+      brief = await buildAndSaveBrief(true);
+    }
+  } catch (err) {
+    return { status: "summary-failed", reason: err instanceof Error ? err.message : String(err), sha: context.sha, metaDir: dir };
+  }
+
+  async function buildAndSaveBrief(stale: boolean): Promise<string> {
+    emit({ kind: "summary-building", message: input.fresh ? "rebuilding change brief (--fresh)…" : stale ? "change brief stale — rebuilding…" : "building change brief…" });
+    let built;
+    try {
+      built = await generator.buildSummary({
+        commitMessage: context.commitMessage,
+        previousCommitMessage: context.previousCommitMessage,
+        diff: genDiff,
+        readme,
+        files: context.filesChanged,
+      });
+    } catch (err) {
+      throw new Error(`summary failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    const rendered = renderSummary(built);
+    if (rendered.length < MIN_SUMMARY_CHARS) {
+      throw new Error(`summary failed: brief too short (${rendered.length} chars)`);
+    }
+    await saveSummary(home, slug, {
+      schema: SUMMARY_SCHEMA,
+      sha: context.sha,
+      createdAt: new Date().toISOString(),
+      model: `${providerId}/${config.models.genModel}`,
+      inputHash: summaryInputHash,
+      summary: built,
+    });
+    emit({ kind: "summary-built", message: `summary: ${input.fresh || stale ? "rebuilt" : "built"} (${rendered.length} chars)` });
+    return rendered;
+  }
+
+  // 8. Generate draft from the brief (summary-only — no raw diff in prompt).
+  emit({ kind: "drafting", message: `drafting ${platform} (streaming${webActive ? ", web search on" : ""}) —` });
+  const opts: GeneratorOptions = { webSearch: webActive, ...(input.telemetry.length > 0 ? { telemetry: input.telemetry } : {}) };
+  const draftGenerator = webActive ? new SdkGenerator(providerId, genKey, config.models.genModel, opts) : generator;
+  const draft = await draftGenerator.generateStream(
+    { platform, context, summary: brief, voiceDefault, voicePlatform, reference, globalPreferences, readme },
     onChunk,
   );
+  if (draft.webSearch === "fallback") {
+    emit({ kind: "gen-model-warning", message: `warning: web search failed (${draft.webError ?? "unknown error"}) — draft completed without it.` });
+  }
 
-  // 7. Persist draft + gen metadata
+  // 9. Persist draft + gen metadata
   const genPayload = {
     platform,
     model: draft.model,
+    summaryInputHash,
+    summaryChars: brief.length,
     ms: draft.ms,
     inputTokens: draft.inputTokens,
     outputTokens: draft.outputTokens,
@@ -213,7 +302,7 @@ export async function generatePipeline(
     writeFile(genJsonPath, JSON.stringify(genPayload, null, 2) + "\n", "utf8"),
   ]);
 
-  // 8. Init review lineage
+  // 10. Init review lineage
   await initReview(dir, platform, draftText);
   const prevReviewSuperseded = prevReview !== null && prevReview.versions.some((v) => v.status !== "pending");
   if (prevReviewSuperseded) {
@@ -224,6 +313,28 @@ export async function generatePipeline(
   }
 
   return { status: "ok", draft, draftPath, metaDir: dir, prevReviewSuperseded };
+}
+
+/** README budget in the prompt — project context, not the draft subject. */
+const MAX_README_CHARS = 3_000;
+
+/**
+ * Repo README at the commit (root README.md, readme.md fallback). Null when
+ * absent/unreadable — the prompt section is omitted entirely, never filler.
+ */
+async function loadReadmeAtCommit(cwd: string, sha: string): Promise<string | null> {
+  for (const name of ["README.md", "readme.md"]) {
+    try {
+      const raw = await readFileAtCommit(cwd, sha, name);
+      if (raw === null || raw === "too-large") continue;
+      const cleaned = cleanText(raw);
+      if (!cleaned) continue;
+      return cleaned.length > MAX_README_CHARS ? cleaned.slice(0, MAX_README_CHARS) + "\n... [README truncated]" : cleaned;
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 function formatSignificance(r: SignificanceResult, sha: string, force: boolean): string {

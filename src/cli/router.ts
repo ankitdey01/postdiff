@@ -33,7 +33,7 @@ export interface CommandOption {
   description: string;
 }
 
-export interface TractCommand {
+export interface PostdiffCommand {
   name: string;
   description: string;
   args?: CommandArg[];
@@ -45,7 +45,7 @@ function argDecl(a: CommandArg): string {
   return a.variadic ? `[${a.name}...]` : `[${a.name}]`;
 }
 
-function register(program: Command, cwd: string, cmd: TractCommand): void {
+function register(program: Command, cwd: string, cmd: PostdiffCommand): void {
   const sub = program.command(cmd.name).description(cmd.description).showHelpAfterError();
   for (const a of cmd.args ?? []) sub.argument(argDecl(a), a.description);
   for (const o of cmd.options ?? []) sub.option(o.flags, o.description);
@@ -74,7 +74,7 @@ export async function runProgram(argv: string[], cwd: string, version: string): 
       }
       program.outputHelp();
     })
-    .addHelpText("after", "Env: TYPESAFE_API_KEY + GROQ_KEY (env, cwd/.env, or ~/.postdiff/.env — run `postdiff setup`).");
+    .addHelpText("after", "Env: TYPESAFE_API_KEY + your provider's key (GROQ_KEY, OPENAI_API_KEY, … — env, cwd/.env, or ~/.postdiff/.env — run `postdiff setup`).");
 
   for (const cmd of ALL_COMMANDS) register(program, cwd, cmd);
 

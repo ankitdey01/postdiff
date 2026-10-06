@@ -1,10 +1,10 @@
-# Tract — Product Requirements Document
+# Postdiff — Product Requirements Document
 
-**Status:** Pre-release. This document is the single source of truth for product, design flow, and decisions made so far. Implementation stack is TypeScript + Node (see `package.json`, `tsconfig.json`, `src/`); LLM provider is Groq transport with `openai/gpt-oss-20b`, swappable via config. CLI binary ships as `postdiff`.
+**Status:** Pre-release. This document is the single source of truth for product, design flow, and decisions made so far. Implementation stack is TypeScript + Node (see `package.json`, `tsconfig.json`, `src/`); generation runs on the Vercel AI SDK over a 10-provider registry (`src/core/generation/providers.ts`, groq default), with provider + model swappable via config. CLI binary ships as `postdiff`.
 
 ## 1. Name & Positioning
 
-- **Name:** Tract — double meaning: a short written work, and the tracking function of git.
+- **Name:** Postdiff — turns meaningful git changes into posts in your voice.
 - **Core value prop:** it just knows who you are, how you talk, and what you're building — no re-explaining your identity/context every time you want to post about your work.
 
 ## 2. Problem
@@ -41,9 +41,9 @@ Solo/indie developers building in public with an existing or growing social pres
 ## 7. Core Features
 
 ### 7.0 First-run setup (decided)
-- **Trigger:** when `~/.postdiff/config.json` does not exist and the invoked command needs API keys (`generate`, `review`), the CLI runs an interactive setup wizard first — once, before `ensureTractHome()` writes the skeleton. `--help`, `-h`, and every other command never hijack; non-TTY runs skip the wizard and surface normal missing-key errors. The wizard also exists as an explicit `postdiff setup` command for new installs and updates (pre-fills name, "enter to keep current" keys).
-- **Prompts (clack `@clack/prompts`):** required `name` (cannot be skipped; signs drafts) → `TYPESAFE_API_KEY` (Jev; link https://console.typesafe.ai/keys) → `GROQ_KEY` (link https://console.groq.com/keys), both **masked password prompts validated live** with one minimal API call each; bad key → error + re-prompt loop → optional multi-line `voice.md` paste (clack `multiline`; empty submit skips) and one optional reference example with a platform picker (reference files are per-platform; no `reference.md` concept). Preferences are not asked — they are LLM-distilled.
-- **Persistence (all-or-nothing):** nothing hits disk until every step completes; cancel mid-way writes nothing. On completion: restructured `config.json` (`{ version, user: { name }, models: { jevModel, threshold, genModel } }`; legacy flat shape migrates in place), keys into `~/.postdiff/.env` (mode 0600, merge-keeps unrelated keys) — **never into config.json** (§8 rule intact) — and optional voice/reference content into the existing profile files.
+- **Trigger:** when `~/.postdiff/config.json` does not exist and the invoked command needs API keys (`generate`, `review`), the CLI runs an interactive setup wizard first — once, before `ensurePostdiffHome()` writes the skeleton. `--help`, `-h`, and every other command never hijack; non-TTY runs skip the wizard and surface normal missing-key errors. The wizard also exists as an explicit `postdiff setup` command for new installs and updates (pre-fills name, "enter to keep current" keys).
+- **Prompts (clack `@clack/prompts`):** required `name` (cannot be skipped; signs drafts) → `TYPESAFE_API_KEY` (Jev; link https://console.typesafe.ai/keys) → **generation provider** (clack `select` over the registry: groq, openai, anthropic, google, xai, mistral, deepseek, openrouter, together, fireworks; preselects the configured one) → **model** (clack `select` of that provider's curated list + "custom model id…" free-text escape hatch) → the provider's API key (label + console URL from the registry, e.g. `GROQ_KEY` at console.groq.com/keys), **masked password prompts validated live** with one minimal API call against the selected model; bad key → error + re-prompt loop → optional multi-line `voice.md` paste (clack `multiline`; empty submit skips) and one optional reference example with a platform picker (reference files are per-platform; no `reference.md` concept). Preferences are not asked — they are LLM-distilled.
+- **Persistence (all-or-nothing):** nothing hits disk until every step completes; cancel mid-way writes nothing. On completion: restructured `config.json` (`{ version, user: { name }, models: { jevModel, threshold, provider, genModel } }`; legacy flat shape migrates in place), keys into `~/.postdiff/.env` (mode 0600, merge-keeps unrelated keys) — **never into config.json** (§8 rule intact) — and optional voice/reference content into the existing profile files.
 - **Key resolution (single point, cli-only):** real env > `cwd/.env` > `~/.postdiff/.env`. `generate`/`review` no longer read `process.env` directly.
 - **Publishing:** package ships at 0.x with `bin: postdiff`; install is `npm i -g postdiff` (plain `npm i postdiff` does not put the binary on PATH).
 
@@ -76,8 +76,8 @@ Solo/indie developers building in public with an existing or growing social pres
 ### 7.4 Generation (decided)
 - Input: committed diff + commit context + changed file contents + paired voice profile (`voice.md` + platform file) + reference examples + global preference rules + target platform
 - One platform per request via `postdiff generate [<sha>] [--force] [--blog|--x|--linkedin]` — no fan-out; each platform drafted separately on demand
-- Provider: Groq transport (`@ai-sdk/groq`, BYOK key in `.env` as `GROQ_KEY`) behind our own `Generator` interface, implemented with the Vercel AI SDK (`ai` + `@ai-sdk/groq`). Default model `openai/gpt-oss-20b` (pinned in `~/.postdiff/config.json`). Single-stage: code-assembled prompt carries the full raw context — no prompt-builder model call. Accept-with-edit triggers a separate LLM call to distill a global preference rule.
-- Web enrichment: Groq browser search attached as a provider-executed tool (no flag, no extra key — billed as tokens on the same key). The model decides whether to search (0-2 calls). Non-gpt-oss models may not support browser search; a warning is emitted but the tool is still passed.
+- Provider: Vercel AI SDK behind our own `Generator` interface (`SdkGenerator`), with the transport picked from the 10-provider registry (`src/core/generation/providers.ts`; OpenRouter via `@openrouter/ai-sdk-provider`). `models.provider` + `models.genModel` pinned in `~/.postdiff/config.json` (missing `provider` backfills as `groq` — no migration ceremony). The registry declares each provider's env key, keys URL, curated models, and web-search support; heavy SDK packages load lazily so non-generation commands stay fast. Default `groq` + `openai/gpt-oss-20b`. Single-stage: code-assembled prompt carries the full raw context — no prompt-builder model call. Accept-with-edit triggers a separate LLM call to distill a global preference rule (same provider/model as generation).
+- Web enrichment: strictly opt-in via `postdiff generate --web` (off by default — no tool attached, no search instruction in the prompt). Per-provider server-side search tool attached as `browser_search`, provider-executed (no extra key — billed to the same key; groq as tokens, anthropic per search). groq: browser search, gpt-oss models only; openai (Responses webSearch), anthropic (webSearch_20250305), google (googleSearch grounding), xai, openrouter (server webSearch; per underlying model): on when supported; mistral/deepseek/together/fireworks: none (their SDKs expose no server search). `--web` on an unsupported provider/model emits a visible warning and drafts without it, and a mid-call web failure retries tool-free once (warned) — never fatal, never a silent pass-through of an unsupported tool.
 - Blog format includes a configurable target word count; blog output is Markdown (links as `[text](url)`)
 
 ### 7.5 Review
@@ -95,7 +95,7 @@ Pipeline, in order:
 1. Diff/commit extraction from the local git repo
 2. Significance filter — Stage 1: whole-commit Jev Noul gate (`--force` bypasses); Stage 2: per-file inclusion filter (trims diff to relevant files)
 3. Context building (commit message + parent + shaped diff + file contents only — no voice, reference, or preferences) — gathered once per sha, cached as `context.json` in `~/.postdiff/repos/<slug>/<sha>/`, reused by every later `generate`/`context` call for that sha. Voice, reference, and preference files are read fresh from `~/.postdiff` on every `generate` call, never cached in `context.json`
-4. Generation (Groq via Vercel AI SDK, model `openai/gpt-oss-20b` with optional browser search)
+4. Generation (Vercel AI SDK over the provider registry — default groq / `openai/gpt-oss-20b`, web search where supported)
 5. Human review (edit/approve/regenerate/reject — required before publish; accept-with-edit distills a global preference rule via LLM)
 6. Publish (copy-only via clipboard per §7.6)
 7. Feedback: accept/reject verdicts + distilled preference rules persist learnings. Full feedback loop (edit deltas feeding voice profile) deferred to V2.
@@ -129,14 +129,14 @@ TBD — to be decided during build. Constraints only:
 
 ## 11. Competitive Landscape
 
-| Tool | What it does | How Tract differs |
+| Tool | What it does | How Postdiff differs |
 |---|---|---|
 | CommitLore | Reads diffs, generates Twitter/LinkedIn/blog content, manual trigger, $12/mo | Cloud/GitHub-webhook + OAuth based. No YouTube-script format. |
-| CommitStream | Commit → X/LinkedIn posts, markets "AI learns your voice" | Same cloud/webhook model; "learns your voice" has no specified mechanism. Tract's is a named 3-signal loop. |
+| CommitStream | Commit → X/LinkedIn posts, markets "AI learns your voice" | Same cloud/webhook model; "learns your voice" has no specified mechanism. Postdiff's is a named 3-signal loop. |
 | Posterly (Ship & Share) | GitHub-commit-to-post as one feature of a broader scheduling platform | Built for scheduled multi-platform auto-publish, not a draft-first developer tool |
 | Postgit / SideProjectBuddy | Commit → tweet/LinkedIn pipelines, GitHub-connected | Same cloud/OAuth pattern |
 
-**Core differentiation:** every competitor found is a cloud SaaS requiring GitHub OAuth. Tract is local-first and terminal/editor-native — works on uncommitted or private-repo work without granting any third party repo access, and runs in the same session where the code was written. None of the competitors surfaced a live "is this worth posting" judgment step as a first-class feature, and none offer a YouTube-script format.
+**Core differentiation:** every competitor found is a cloud SaaS requiring GitHub OAuth. Postdiff is local-first and terminal/editor-native — works on uncommitted or private-repo work without granting any third party repo access, and runs in the same session where the code was written. None of the competitors surfaced a live "is this worth posting" judgment step as a first-class feature, and none offer a YouTube-script format.
 
 ## 12. Business Model (draft, not finalized)
 
@@ -156,7 +156,7 @@ TBD — to be decided during build. Constraints only:
 1. Diff/commit extraction
 2. Significance filter (Jev Noul judge + `--force` bypass)
 3. Voice profile loader (per-platform `.md` files: `blog.md`, `x.md`, `linkedin.md`)
-4. Generation — prompt builder + Groq call via Vercel AI SDK, one platform per request (Blog, X, LinkedIn; YouTube deferred)
+4. Generation — prompt builder + provider call via Vercel AI SDK (provider registry), one platform per request (Blog, X, LinkedIn; YouTube deferred)
 5. Review output (display + file persistence to global `~/.postdiff`)
 6. Publish — copy-only (`clipboardy`; gate: accepted + hash-matched, per §7.6)
 7. Feedback loop — V2 (deferred): persist edit/accept/reject signal, feed back into voice profile. V1 ships static voice only.
@@ -168,12 +168,12 @@ TBD — to be decided during build. Constraints only:
 - Voice profile pre-loaded with real past posts before demo day — no live calibration, no cold-start risk on stage
 - Live demo flow: real commit made live → LLM significance check → all 4 formats generated → publish copies the accepted draft, paste live, on stage
 - Significance filter runs LLM-judged (not heuristic-only) for the demo, specifically because it's the more impressive path — mitigated by the timeout+fallback described in 7.2
-- Dogfooding note: whether the live commit is against Tract's own repo (showing the tool write about itself being built) or a separate demo repo is a presentation choice, not yet locked
+- Dogfooding note: whether the live commit is against Postdiff's own repo (showing the tool write about itself being built) or a separate demo repo is a presentation choice, not yet locked
 
 ## 16. Open Questions
 
 - ~~Voice profile scope: global per-user vs. per-project~~ → Resolved: global per-user (§7.3)
-- Real, verified statistics for the business/impact case are not yet sourced — competitor-published engagement stats must not be used as Tract's own supporting facts
+- Real, verified statistics for the business/impact case are not yet sourced — competitor-published engagement stats must not be used as Postdiff's own supporting facts
 - Pricing model numbers not yet modeled against actual API costs
-- Team name/branding beyond the product name "Tract" not yet finalized
-- ~~Implementation stack~~ → Resolved: TypeScript + Node, Groq via Vercel AI SDK (`@ai-sdk/groq`), model `openai/gpt-oss-20b`, `@typesafe-ai/sdk` for Jev, `commander` for CLI, `clipboardy` for publish
+- Team name/branding beyond the product name "Postdiff" not yet finalized
+- ~~Implementation stack~~ → Resolved: TypeScript + Node, Vercel AI SDK over the provider registry (groq default; provider + model in config), `@typesafe-ai/sdk` for Jev, `commander` for CLI, `clipboardy` for publish

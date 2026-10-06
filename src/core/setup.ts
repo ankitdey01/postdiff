@@ -7,10 +7,10 @@
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { generateText } from "ai";
-import { createGroq } from "@ai-sdk/groq";
 import { overwriteVoiceSample } from "./profile/voice.js";
 import { overwriteReferenceExample, platformReferenceFile } from "./profile/reference.js";
-import { ensureTractHome, getConfigPath, getEnvPath, loadConfig, DEFAULT_CONFIG, CONFIG_VERSION } from "./store.js";
+import { ensurePostdiffHome, getConfigPath, getEnvPath, loadConfig, DEFAULT_CONFIG, CONFIG_VERSION } from "./store.js";
+import { getProviderSpec } from "./generation/providers.js";
 import { withTimeout } from "./async.js";
 
 import type { Platform } from "../shared/types.js";
@@ -18,7 +18,12 @@ import type { Platform } from "../shared/types.js";
 export interface SetupAnswers {
   name: string;
   typesafeKey: string;
-  groqKey: string;
+  /** Generation provider id from the registry (providers.ts). */
+  provider: string;
+  /** Generation model id — pinned into config.models.genModel. */
+  genModel: string;
+  /** API key for the selected provider, stored under its env var. */
+  providerKey: string;
   /** Optional full voice.md content (empty/undefined = leave untouched). */
   voiceMd?: string;
   /** Optional reference example: which platform file it lands in. */
@@ -60,35 +65,37 @@ export async function pingTypesafeKey(apiKey: string): Promise<string | null> {
   }
 }
 
-/** Live Groq validation: one tiny generation. Null = key works. */
-export async function pingGroqKey(apiKey: string, model: string = DEFAULT_CONFIG.models.genModel): Promise<string | null> {
+/**
+ * Live provider validation: one tiny generation against the selected model.
+ * Null = key works. No maxOutputTokens cap — Responses/reasoning APIs reject
+ * tiny budgets, and an uncapped "ping" costs fractions of a cent anyway.
+ */
+export async function pingProviderKey(providerId: string, apiKey: string, model?: string): Promise<string | null> {
+  const spec = getProviderSpec(providerId);
+  if (!spec) return `Unknown provider "${providerId}".`;
+  const modelId = model?.trim() || spec.models[0];
   try {
-    await withTimeout(
-      generateText({
-        model: createGroq({ apiKey })(model),
-        prompt: "ping",
-        maxOutputTokens: 5,
-      }),
-      PING_TIMEOUT_MS,
-    );
+    const runtime = await withTimeout(spec.load(apiKey), PING_TIMEOUT_MS);
+    await withTimeout(generateText({ model: runtime.model(modelId), prompt: "ping" }), PING_TIMEOUT_MS);
     return null;
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
   }
 }
 
-/** Rewrites ~/.postdiff/.env, replacing the two known keys and keeping everything else. */
-async function writeEnvFile(envPath: string, typesafeKey: string, groqKey: string): Promise<void> {
+/** Pre-registry Groq-only ping, kept as a thin alias. */
+export async function pingGroqKey(apiKey: string, model: string = DEFAULT_CONFIG.models.genModel): Promise<string | null> {
+  return pingProviderKey("groq", apiKey, model);
+}
+
+/** Rewrites ~/.postdiff/.env, replacing the given keys and keeping everything else. */
+async function writeEnvFile(envPath: string, wanted: Array<[string, string]>): Promise<void> {
   let lines: string[] = [];
   try {
     lines = (await readFile(envPath, "utf8")).split(/\r?\n/);
   } catch {
     // No existing file — start fresh.
   }
-  const wanted: Array<[string, string]> = [
-    ["TYPESAFE_API_KEY", typesafeKey],
-    ["GROQ_KEY", groqKey],
-  ];
   for (const [key, rawValue] of wanted) {
     const value = rawValue.trim();
     if (/[\r\n]/.test(key) || /[\r\n]/.test(value)) {
@@ -111,19 +118,26 @@ async function writeEnvFile(envPath: string, typesafeKey: string, groqKey: strin
  * content. Call only once with complete answers — there is no partial write.
  */
 export async function applySetup(answers: SetupAnswers): Promise<SetupResult> {
-  const home = await ensureTractHome();
+  const home = await ensurePostdiffHome();
 
-  // Preserve any customized models; only the user block is ours to set.
+  const spec = getProviderSpec(answers.provider);
+  if (!spec) throw new Error(`Unknown generation provider "${answers.provider}".`);
+
+  // Provider + model are ours to set; Jev model/threshold stay user-customized.
   const current = await loadConfig();
   const config = {
     version: CONFIG_VERSION,
     user: { name: answers.name.trim() },
-    models: current.models,
+    models: { ...current.models, provider: answers.provider, genModel: answers.genModel },
   };
   // Keys first, config.json last: config.json is the first-run sentinel, so it
-  // must only appear once both writes succeeded.
+  // must only appear once both writes succeeded. A previously-saved key for
+  // another provider is left in place so switching back is free.
   const envPath = getEnvPath();
-  await writeEnvFile(envPath, answers.typesafeKey, answers.groqKey);
+  await writeEnvFile(envPath, [
+    ["TYPESAFE_API_KEY", answers.typesafeKey],
+    [spec.envKey, answers.providerKey],
+  ]);
 
   const configPath = getConfigPath();
   const tmp = `${configPath}.tmp-${process.pid}-${Date.now()}`;

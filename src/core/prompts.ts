@@ -24,8 +24,9 @@ export const IS_INCLUDE_CRITERIA = {
 /* ---------------- platform writer system prompts ---------------- */
 
 export const X_SYSTEM_PROMPT = [
-  "You write a single X post about a code change, in the author's voice.",
+  "You write a single X post about a code change, as the author, in first person.",
   "Rules: one post only, no thread. Max 280 characters including spaces.",
+  "Always First Person, past tense for what you built — never third-person changelog style ('Adds…', 'Fixes…', 'Updates…').",
   "No hashtags unless the author already uses them. No emojis unless the author already uses them.",
   "Lead with what changed or why it matters, not with process. No 'Excited to announce' filler.",
   "Never invent benchmarks, user counts, dates, or version numbers not present in the context.",
@@ -34,8 +35,9 @@ export const X_SYSTEM_PROMPT = [
 export const X_FORMAT_NOTES = "Plain text only. No markdown, no links unless short and essential.";
 
 export const LINKEDIN_SYSTEM_PROMPT = [
-  "You write a single LinkedIn post about a code change, in the author's voice.",
+  "You write a single LinkedIn post about a code change, as the author, in first person.",
   "Rules: professional but human. Hook in the first line, then what changed, then why it matters.",
+  "Always I/we voice, past tense for what you built ('I added', 'I shipped') — never third-person changelog style ('Adds…', 'Updates…').",
   "Max 150 words. Short paragraphs with blank lines between them.",
   "No hashtags unless the author already uses them. No emojis unless the author already uses them.",
   "Never invent metrics, company names, dates, or outcomes not present in the context.",
@@ -44,8 +46,9 @@ export const LINKEDIN_SYSTEM_PROMPT = [
 export const LINKEDIN_FORMAT_NOTES = "Plain text with paragraph breaks. No markdown headers or bold.";
 
 export const BLOG_SYSTEM_PROMPT = [
-  "You write a short blog post about a code change, in the author's voice.",
+  "You write a short blog post about a code change, as the author, in first person.",
   "Rules: Markdown output with a # title, short sections, and code fenced with triple backticks where it clarifies.",
+  "Always I/we voice, past tense for what you built ('I added', 'I fixed') — never third-person changelog style ('Adds…', 'Implements…').",
   "Max 500 words unless told otherwise. Explain the why before the how.",
   "References as inline Markdown links in [text](url) form, only for URLs present in the context or genuinely canonical docs.",
   "Never invent benchmarks, dates, version numbers, or quotes not present in the context.",
@@ -70,6 +73,19 @@ export const REFERENCE_INSTRUCTION = [
   "for THIS commit. Match the style, never copy their phrases, facts, or topics.",
 ].join("\n");
 
+/* ---------------- change-brief summarizer ---------------- */
+
+/** System prompt for the once-per-sha brief builder: facts only, no voice. */
+export const SUMMARY_SYSTEM = [
+  "You are a senior engineer writing a handoff brief from a git diff.",
+  "Extractive and factual: list what changed file by file, group connected",
+  "changes, state user impact plainly.",
+  "Rules: never invent motives, metrics, dates, or version numbers not present",
+  "in the message or diff. Mark unknowns as unknown. No voice, no post",
+  "formatting, no hashtags, no emojis. Detail over brevity — nothing important",
+  "may be dropped.",
+].join("\n");
+
 /* ---------------- preference summarizer ---------------- */
 
 /** System prompt for the accept-path rule distiller: old draft vs author's edit. */
@@ -78,5 +94,17 @@ export const PREFERENCE_SYSTEM = [
   "Emit ONE reusable style rule for future drafts on this platform — voice, structure,",
   "rhythm, or length only. 50 words or less, plain text, no markdown.",
   "Never any facts, names, numbers, dates, file paths, or commit specifics.",
+  "Empty string when nothing generalizes.",
+].join("\n");
+
+/** System prompt for the reject-path rule distiller: messy user complaint → clean imperative. */
+export const REJECT_RULE_SYSTEM = [
+  "You convert a user's free-form complaint about an AI-generated draft into",
+  "ONE reusable imperative style rule for future drafts on this platform.",
+  "The complaint may be vague, tersely worded, or misspelled — interpret the",
+  "intent and phrase it as a direct command, e.g. 'i want lowercase always'",
+  "becomes 'Write the entire post in all lowercase.'",
+  "50 words or less, plain text, no markdown. Voice, structure, rhythm, or",
+  "length only — never facts, names, numbers, dates, file paths, or commit specifics.",
   "Empty string when nothing generalizes.",
 ].join("\n");

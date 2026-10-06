@@ -8,20 +8,22 @@ export type { SignificanceInput, SignificanceResult, SignificanceJudge } from ".
 export { JevInclusionJudge, filterShapedDiff } from "./core/significance/inclusion.js";
 export type { InclusionJudge, FileInclusion, FilteredDiff } from "./core/significance/inclusion.js";
 export {
-  getTractHome,
+  getPostdiffHome,
   getConfigPath,
   getEnvPath,
   getRepoSlug,
-  ensureTractHome,
+  ensurePostdiffHome,
   loadConfig,
   saveMeta,
   hashDiff,
   DEFAULT_CONFIG,
   CONFIG_VERSION,
 } from "./core/store.js";
-export type { TractConfig, TractUser, TractModels, DraftMeta } from "./core/store.js";
-export { applySetup, pingTypesafeKey, pingGroqKey } from "./core/setup.js";
+export type { PostdiffConfig, PostdiffUser, PostdiffModels, DraftMeta } from "./core/store.js";
+export { applySetup, pingTypesafeKey, pingProviderKey, pingGroqKey } from "./core/setup.js";
 export type { SetupAnswers, SetupResult } from "./core/setup.js";
+export { PROVIDERS, getProviderSpec, providerEnvKeys } from "./core/generation/providers.js";
+export type { ProviderSpec, ProviderRuntime } from "./core/generation/providers.js";
 export { ensureVoiceFiles, VOICE_FILES } from "./core/profile/voice.js";
 export type { VoiceFile } from "./core/profile/voice.js";
 export {
@@ -59,7 +61,7 @@ export {
 export { gatherCommitContext, loadOrGatherCommitContext, saveCommitContext, loadCommitContext } from "./core/source/context.js";
 export { cleanText, MAX_FILE_CHARS, MAX_TOTAL_CHARS, CONTEXT_SCHEMA } from "./core/source/context.js";
 export type { CommitContext, ContextFile, OmitReason } from "./core/source/context.js";
-export { GroqGenerator, platformDraftFile, MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule } from "./core/generation/generator.js";
+export { SdkGenerator, GroqGenerator, platformDraftFile, MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule } from "./core/generation/generator.js";
 export type { GenerateInput, DraftResult, Generator, GeneratorOptions } from "./core/generation/generator.js";
 export { generatePipeline } from "./core/generation/pipeline.js";
 export type { PipelineInput, PipelineEvent, PipelineResult } from "./core/generation/pipeline.js";
@@ -75,5 +77,6 @@ export type { ReviewStatus, ReviewVersion, ReviewState, VerdictInput, VerdictOut
 export { preparePublish } from "./core/delivery/publish.js";
 export type { PublishReady } from "./core/delivery/publish.js";
 export { assemblePrompt } from "./core/generation/assemble.js";
-export { platformSpec, X_SPEC, LINKEDIN_SPEC, BLOG_SPEC } from "./core/generation/platforms.js";
+export { SUMMARY_SCHEMA, MIN_SUMMARY_CHARS, SummarySchema, hashSummaryInput, loadSummary, saveSummary, renderSummary } from "./core/summary/summary.js";
+export type { CommitSummary, CachedSummary } from "./core/summary/summary.js";export { platformSpec, X_SPEC, LINKEDIN_SPEC, BLOG_SPEC } from "./core/generation/platforms.js";
 export type { PlatformSpec } from "./core/generation/platforms.js";

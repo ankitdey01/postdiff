@@ -36,9 +36,12 @@ function reviewPath(dir: string, platform: Platform): string {
   return join(dir, reviewFileName(platform));
 }
 
-/** Rejected versions hold no history: the reason is templated into a global rule, then dropped. */
+/** Reject-reason fallback: the trimmed reason, verbatim. Used when no
+ * summarizer is available or distillation fails — the verdict never depends
+ * on the LLM. Distilled rules (via `distillReject`) replace this whenever
+ * they produce one. */
 export function rejectRuleFor(reason: string): string {
-  return truncateRule(`The user rejects when ${reason.trim()}`.slice(0, MAX_RULE_CHARS));
+  return truncateRule(reason.trim());
 }
 
 interface LegacyVersion {
@@ -106,7 +109,12 @@ export interface VerdictInput {
   fileContent: string;
   accept: boolean;
   reason?: string;
-  /** Accept-with-edit only. Reject never touches it, so callers omit it there. */
+  /**
+   * Accept-with-edit distillation, and reject-reason distillation when the
+   * caller can provide one (CLI passes it when a provider key is available).
+   * Absent → reject rules fall back to the trimmed reason verbatim, so a
+   * reject never requires a key and never fails on distillation.
+   */
   summarizer?: Generator;
 }
 
@@ -117,9 +125,11 @@ export type VerdictOutcome =
 
 /**
  * Accept-only learning. Accept snapshots + distills (LLM, only on changed
- * text). Reject never snapshots and never calls the LLM: reasoned rejects
- * template a rule. Only a pending version is removed — accepted history is
- * never deleted by a reject; the on-disk edit is simply abandoned.
+ * text). Reject never snapshots: a reasoned reject distills the reason into a
+ * clean imperative rule (LLM when the caller supplies a summarizer, verbatim
+ * fallback otherwise), then drops the version. Only a pending version is
+ * removed — accepted history is never deleted by a reject; the on-disk edit
+ * is simply abandoned.
  */
 export async function recordVerdict(input: VerdictInput): Promise<VerdictOutcome> {
   const state = await readReviewState(input.dir, input.platform);
@@ -133,7 +143,15 @@ export async function recordVerdict(input: VerdictInput): Promise<VerdictOutcome
 async function rejectVerdict(state: ReviewState, input: VerdictInput): Promise<VerdictOutcome> {
   const latest = state.versions[state.versions.length - 1];
   const reason = input.reason?.trim() || null;
-  const globalRule = reason ? rejectRuleFor(reason) : "";
+  let globalRule = reason ? rejectRuleFor(reason) : "";
+  if (reason && input.summarizer) {
+    try {
+      const distilled = await input.summarizer.distillReject(reason);
+      if (distilled) globalRule = distilled;
+    } catch {
+      // Distillation failed — verbatim rule above already stands.
+    }
+  }
   if (!latest || latest.status !== "pending") return { kind: "rejected-kept", globalRule };
   // Drop the pending version; no snapshot of on-disk edits ever happens here.
   state.versions.pop();

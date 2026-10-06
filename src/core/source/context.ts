@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { getCommitPayload, getFileStatuses, getParentMessage, readFileAtCommit, resolveSha } from "./git.js";
 import { isIgnoredPath } from "./ignore.js";
-import { getRepoSlug, getTractHome } from "../store.js";
+import { getRepoSlug, getPostdiffHome } from "../store.js";
 
 /** Per-file content cap; larger files truncate with a marker. */
 export const MAX_FILE_CHARS = 12_000;
@@ -179,7 +179,7 @@ export async function loadOrGatherCommitContext(
   cwd: string,
   shaOrHead: string = "HEAD"
 ): Promise<{ context: CommitContext; source: "cached" | "gathered" }> {
-  const home = getTractHome();
+  const home = getPostdiffHome();
   const [sha, slug] = await Promise.all([resolveSha(cwd, shaOrHead), getRepoSlug(cwd)]);
   const cached = await loadCommitContext(home, slug, sha);
   if (cached) return { context: cached, source: "cached" };

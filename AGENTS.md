@@ -11,14 +11,14 @@ Don't overcomplicate, instead do smart engineering changes. Dont over engineer s
 
 ## Current state
 
-All seven CLI commands implemented: `postdiff context`, `postdiff generate`, `postdiff voice`, `postdiff review`, `postdiff reference`, `postdiff preferences`, `postdiff publish`. Significance (Jev gate + per-file inclusion filter), generation (Groq via Vercel AI SDK, model `openai/gpt-oss-20b` with browser search), review (accept/reject with LLM rule distillation), publish (clipboard copy-only). Test/eval harness deferred (PRD §14.9). Do not assume test/lint/CI commands exist.
+All seven CLI commands implemented: `postdiff context`, `postdiff generate`, `postdiff voice`, `postdiff review`, `postdiff reference`, `postdiff preferences`, `postdiff publish`. Significance (Jev gate + per-file inclusion filter), generation (Vercel AI SDK over a 10-provider registry in `src/core/generation/providers.ts` — groq default; provider + model in `config.json`; server-side web search strictly opt-in via `generate --web`, off by default, warn + tool-free fallback when unsupported), review (accept/reject with LLM rule distillation), publish (clipboard copy-only). Test/eval harness deferred (PRD §14.9). Do not assume test/lint/CI commands exist.
 
 ## Design flow (from PRD §8)
 
 Capability pipeline, in order: diff/commit extraction → significance filter (Jev gate + per-file inclusion) → context building (commit message + parent + shaped diff + file contents; cached per sha) → generation (voice, reference, preferences loaded fresh per call) → human review → publish (copy-only) → feedback via preference rules.
 
 - Engine is UI-agnostic: interfaces call it, it never depends on them. Simplest terminal-native surface ships first; editor integration later.
-- LLM provider: Groq transport (`@ai-sdk/groq`) with `openai/gpt-oss-20b`; swappable via `config.json`. Secrets passed into the engine as inputs, never read inside it.
+- LLM provider: Vercel AI SDK over the provider registry (`src/core/generation/providers.ts`): groq, openai, anthropic, google, xai, mistral, deepseek, openrouter, together, fireworks. Provider + `genModel` live in `config.json`; each provider declares its env key, curated models, and whether its server-side web search applies (groq: gpt-oss only). Web-search tools are provider-executed and never SDK-visible, attaching only under `generate --web` (off by default). Secrets passed into the engine as inputs, never read inside it.
 - Coverage lives where the logic lives (significance, context, generation, voice/feedback).
 
 ## Build discipline (non-negotiable workflow)
@@ -49,8 +49,8 @@ Build one capability slice at a time, then stop. Verify it live with the user be
 Loaded from `cwd/.env` if not already set. No dotenv dependency — hand-rolled loader in `src/cli/main.ts`.
 
 - `TYPESAFE_API_KEY` — TypeSafe Jev API key for significance judgments
-- `GROQ_KEY` — Groq inference API key for generation
-- `TRACT_DEVTOOLS` — optional; enables Vercel AI SDK devtools telemetry
+- Provider key for generation — the env var is per provider: `GROQ_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `XAI_API_KEY`, `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`, `TOGETHER_API_KEY`, `FIREWORKS_API_KEY` (chosen in `postdiff setup`)
+- `POSTDIFF_DEVTOOLS` — optional; enables Vercel AI SDK devtools telemetry
 
 ## Agent skills
 

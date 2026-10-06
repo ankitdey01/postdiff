@@ -10,35 +10,38 @@ import { ensureVoiceFiles } from "./profile/voice.js";
 import { ensureReferenceFiles } from "./profile/reference.js";
 import { ensurePreferenceFiles } from "./profile/preferences.js";
 
-export interface TractUser {
+export interface PostdiffUser {
   name: string;
 }
 
-export interface TractModels {
+export interface PostdiffModels {
   jevModel: string;
   threshold: number;
+  /** Generation provider id (key into the registry in generation/providers.ts). */
+  provider: string;
   genModel: string;
 }
 
-export interface TractConfig {
+export interface PostdiffConfig {
   version: number;
-  user: TractUser;
-  models: TractModels;
+  user: PostdiffUser;
+  models: PostdiffModels;
 }
 
 export const CONFIG_VERSION = 1;
 
-export const DEFAULT_CONFIG: TractConfig = {
+export const DEFAULT_CONFIG: PostdiffConfig = {
   version: CONFIG_VERSION,
   user: { name: "" },
   models: {
     jevModel: "jev-latest",
     threshold: 0.5,
+    provider: "groq",
     genModel: "openai/gpt-oss-20b",
   },
 };
 
-export function getTractHome(): string {
+export function getPostdiffHome(): string {
   return join(homedir(), ".postdiff");
 }
 
@@ -48,12 +51,12 @@ function writeDefaultConfig(path: string): Promise<void> {
 
 /** Path to the global config.json — the first-run setup sentinel. */
 export function getConfigPath(): string {
-  return join(getTractHome(), "config.json");
+  return join(getPostdiffHome(), "config.json");
 }
 
 /** Path to the global env file where setup stores API keys. */
 export function getEnvPath(): string {
-  return join(getTractHome(), ".env");
+  return join(getPostdiffHome(), ".env");
 }
 
 function sha1Hex(s: string, len: number): string {
@@ -80,8 +83,8 @@ export async function getRepoSlug(cwd: string): Promise<string> {
 }
 
 /** Full first-run skeleton: voice + reference + preference files, config, repos dir. */
-export async function ensureTractHome(): Promise<string> {
-  const home = getTractHome();
+export async function ensurePostdiffHome(): Promise<string> {
+  const home = getPostdiffHome();
   await ensureVoiceFiles(join(home, "voice"));
   await ensureReferenceFiles(join(home, "reference"));
   await ensurePreferenceFiles(join(home, "preferences"));
@@ -95,13 +98,13 @@ export async function ensureTractHome(): Promise<string> {
   return home;
 }
 
-export async function loadConfig(): Promise<TractConfig> {
-  const home = await ensureTractHome();
+export async function loadConfig(): Promise<PostdiffConfig> {
+  const home = await ensurePostdiffHome();
   const path = join(home, "config.json");
-  let parsed: Partial<TractConfig> & Record<string, unknown> = {};
+  let parsed: Partial<PostdiffConfig> & Record<string, unknown> = {};
   let corruptOrMissing = false;
   try {
-    parsed = JSON.parse(await readFile(path, "utf8")) as Partial<TractConfig> & Record<string, unknown>;
+    parsed = JSON.parse(await readFile(path, "utf8")) as Partial<PostdiffConfig> & Record<string, unknown>;
   } catch {
     // Missing or corrupt — fall through to defaults and rewrite.
     corruptOrMissing = true;
@@ -110,10 +113,10 @@ export async function loadConfig(): Promise<TractConfig> {
   // Legacy flat shape (pre-v1: { jevModel, threshold, genModel }) lifts into `models`.
   const legacy = parsed as { jevModel?: unknown; threshold?: unknown; genModel?: unknown };
   const hasLegacy = !parsed.models && (typeof legacy.jevModel === "string" || typeof legacy.threshold === "number" || typeof legacy.genModel === "string");
-  const rawModels = (parsed.models ?? legacy) as Partial<TractModels>;
-  const rawUser: Partial<TractUser> = parsed.user ?? {};
+  const rawModels = (parsed.models ?? legacy) as Partial<PostdiffModels>;
+  const rawUser: Partial<PostdiffUser> = parsed.user ?? {};
 
-  const merged: TractConfig = {
+  const merged: PostdiffConfig = {
     version: CONFIG_VERSION,
     user: {
       name: typeof rawUser.name === "string" ? rawUser.name : "",
@@ -121,6 +124,9 @@ export async function loadConfig(): Promise<TractConfig> {
     models: {
       jevModel: typeof rawModels.jevModel === "string" ? rawModels.jevModel : DEFAULT_CONFIG.models.jevModel,
       threshold: typeof rawModels.threshold === "number" ? rawModels.threshold : DEFAULT_CONFIG.models.threshold,
+      // Missing provider (pre-registry config) backfills as groq in place —
+      // no dedicated migration: loadConfig rewrites the merged shape anyway.
+      provider: typeof rawModels.provider === "string" && rawModels.provider ? rawModels.provider : DEFAULT_CONFIG.models.provider,
       genModel: typeof rawModels.genModel === "string" ? rawModels.genModel : DEFAULT_CONFIG.models.genModel,
     },
   };
@@ -162,7 +168,7 @@ export function hashDiff(diff: string): string {
 }
 
 export async function saveMeta(slug: string, sha: string, meta: DraftMeta): Promise<string> {
-  const dir = join(getTractHome(), "repos", slug, sha);
+  const dir = join(getPostdiffHome(), "repos", slug, sha);
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await writeFile(join(dir, "meta.json"), JSON.stringify(meta, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
   return dir;

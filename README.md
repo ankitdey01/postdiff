@@ -1,4 +1,4 @@
-# Tract
+# Postdiff
 
 Turns your git commits into ready-to-post content — blog, X, LinkedIn (YouTube script deferred to post-v1) — in your own voice.
 
@@ -10,7 +10,7 @@ CLI tool ships as `postdiff`. All slices implemented: context, generate, voice, 
 npm i -g postdiff
 ```
 
-First `postdiff generate` (or `review`) walks you through setup: your name, a [Jev/TypeSafe key](https://console.typesafe.ai/keys), a [Groq key](https://console.groq.com/keys) — both validated live — and optional voice/reference markdown. Or run `postdiff setup` explicitly (also for updates).
+First `postdiff generate` (or `review`) walks you through setup: your name, a [Jev/TypeSafe key](https://console.typesafe.ai/keys), then a generation provider (Groq, OpenAI, Anthropic, Google Gemini, xAI, Mistral, DeepSeek, OpenRouter, Together.ai, Fireworks), its model, and its key — all validated live — and optional voice/reference markdown. Or run `postdiff setup` explicitly (also for updates).
 
 Where things live: name → `~/.postdiff/config.json`; API keys → `~/.postdiff/.env` (precedence: real env > `cwd/.env` > `~/.postdiff/.env`); voice/reference/preferences → `~/.postdiff/`. Keys are never written to `config.json`.
 
@@ -28,7 +28,7 @@ flowchart LR
             GITMOD["Diff + Commit Extraction"]
             FILTER{"Significance Filter\nStage 1: whole-commit Jev gate\nStage 2: per-file inclusion\n(--force bypasses)"}
             CTX["Context Builder\ncommit msg + parent + shaped diff\n+ changed file contents"]
-            GEN["Generation\nGroq transport · openai/gpt-oss-20b\n+ browser search tool"]
+            GEN["Generation\nprovider registry · model from config\n+ opt-in --web search where supported"]
             VOICE["Voice Profile\nvoice.md + platform .md"]
             REF["Reference + Preferences\nper-platform examples & rules"]
             REVIEW["Review State\naccept / reject / edit → preference rules"]
@@ -36,7 +36,7 @@ flowchart LR
         end
     end
 
-    LLM["Groq API\n(@ai-sdk/groq)"]
+    LLM["Provider API\n(groq, openai, anthropic, google,\nxai, mistral, deepseek, openrouter,\ntogether, fireworks)"]
 
     subgraph PUBLISH["Publish (copy-only)"]
         COPY["Clipboard — copy approved draft\n(user pastes anywhere)"]

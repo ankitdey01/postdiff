@@ -4,12 +4,11 @@
 // leaves the previous install untouched.
 
 import * as p from "@clack/prompts";
-import { applySetup, pingGroqKey, pingTypesafeKey, loadConfig, type Platform } from "../../index.js";
+import { applySetup, pingProviderKey, pingTypesafeKey, loadConfig, PROVIDERS, getProviderSpec, type Platform, type ProviderSpec } from "../../index.js";
 import { resolveKeys } from "../keys.js";
-import type { CommandContext, TractCommand } from "../router.js";
+import type { CommandContext, PostdiffCommand } from "../router.js";
 
 const TYPESAFE_KEYS_URL = "https://console.typesafe.ai/keys";
-const GROQ_KEYS_URL = "https://console.groq.com/keys";
 
 function cancelled(): never {
   p.cancel("Setup cancelled — nothing was saved.");
@@ -30,8 +29,9 @@ async function promptRequiredKey(
   currentKey: string,
 ): Promise<string> {
   const hint = currentKey ? " (enter to keep current)" : "";
+  // One bordered box per key (not per attempt) so the gutter never doubles up.
+  p.note(url, `Get a key · ${label}`);
   for (;;) {
-    p.log.info(`Create a key: ${url}`);
     const value = await p.password({ message: `${label}${hint}` });
     if (p.isCancel(value)) cancelled();
     const typed = value.trim();
@@ -48,18 +48,63 @@ async function promptRequiredKey(
       s.stop(`${label} works.`);
       return typed;
     }
-    s.stop(`Validation failed.`);
+    s.error(`Validation failed.`);
     p.log.error(err);
   }
 }
 
 async function promptOptionalMarkdown(label: string, what: string): Promise<string> {
+  // Gated behind a confirm so skipping is one keypress. NOTE: no
+  // `showSubmit` here — that flag disables double-Enter-to-submit and turns
+  // every Enter into a newline with no way out except Tab.
+  const add = await p.confirm({ message: `Add ${label}? (optional)`, initialValue: false });
+  if (p.isCancel(add)) cancelled();
+  if (!add) return "";
   const value = await p.multiline({
-    message: `${label} (optional — paste content, press Enter twice to submit, or leave empty to skip)`,
+    message: `Paste ${what} — Enter twice to submit, empty skips`,
     placeholder: `Your ${what} markdown…`,
   });
   if (p.isCancel(value)) cancelled();
   return value.trim();
+}
+
+/** Sentinel value for the "type any model id" option in the model picker. */
+const CUSTOM_MODEL = "__custom__";
+
+/** Provider picker: curated registry, preselecting the currently configured one. */
+async function promptProvider(currentId: string): Promise<ProviderSpec> {
+  const selected = await p.select({
+    message: "Generation provider",
+    initialValue: getProviderSpec(currentId)?.id,
+    options: PROVIDERS.map((s) => ({ value: s.id, label: s.label, hint: s.envKey })),
+  });
+  if (p.isCancel(selected)) cancelled();
+  const spec = getProviderSpec(selected);
+  if (!spec) cancelled();
+  return spec;
+}
+
+/** Model picker: curated per provider, plus a custom-id escape hatch. */
+async function promptModel(spec: ProviderSpec, currentModel: string): Promise<string> {
+  const preselect = spec.models.includes(currentModel) ? currentModel : spec.models[0];
+  const selected = await p.select({
+    message: `Model for ${spec.label}`,
+    initialValue: preselect,
+    options: [
+      ...spec.models.map((m) => ({ value: m, label: m, hint: m === spec.models[0] ? "recommended" : undefined })),
+      { value: CUSTOM_MODEL, label: "Custom model id…", hint: "any model id this provider serves" },
+    ],
+  });
+  if (p.isCancel(selected)) cancelled();
+  if (selected !== CUSTOM_MODEL) return selected;
+  const custom = await p.text({
+    message: "Model id",
+    initialValue: currentModel.trim() || preselect,
+    placeholder: spec.models[0],
+    validate: (v) => (!v || !v.trim() ? "Model id is required." : undefined),
+  });
+  if (p.isCancel(custom)) cancelled();
+  return custom.trim();
 }
 
 /** Reference examples are per-platform: ask which platform the paste belongs to. */
@@ -93,15 +138,14 @@ export async function runSetupWizard(): Promise<boolean> {
 }
 
 async function wizard(): Promise<boolean> {
-  const { typesafeKey: currentTypesafe, groqKey: currentGroq } = resolveKeys();
-  const currentUser = await loadConfig().then((c) => c.user.name);
+  const { typesafeKey: currentTypesafe, providerKeys } = resolveKeys();
+  const config = await loadConfig();
+  const currentUser = config.user.name;
 
   p.intro("postdiff setup");
-  p.log.message(
-    "Everything stays local:\n" +
-      "  name      → ~/.postdiff/config.json\n" +
-      "  API keys  → ~/.postdiff/.env (never in config.json)\n" +
-      "  voice/reference → ~/.postdiff/{voice,reference}/",
+  p.note(
+    "name      → ~/.postdiff/config.json\nAPI keys  → ~/.postdiff/.env (never in config.json)\nvoice/reference → ~/.postdiff/{voice,reference}/",
+    "Everything stays local",
   );
 
   const name = await p.text({
@@ -112,7 +156,16 @@ async function wizard(): Promise<boolean> {
   if (p.isCancel(name)) cancelled();
 
   const typesafeKey = await promptRequiredKey("TYPESAFE_API_KEY (Jev)", TYPESAFE_KEYS_URL, pingTypesafeKey, currentTypesafe);
-  const groqKey = await promptRequiredKey("GROQ_KEY", GROQ_KEYS_URL, pingGroqKey, currentGroq);
+
+  const providerSpec = await promptProvider(config.models.provider);
+  const genModel = await promptModel(providerSpec, config.models.genModel);
+  const currentProviderKey = providerKeys[providerSpec.envKey] ?? "";
+  const providerKey = await promptRequiredKey(
+    providerSpec.envKey,
+    providerSpec.keysUrl,
+    (key) => pingProviderKey(providerSpec.id, key, genModel),
+    currentProviderKey,
+  );
 
   const voiceMd = await promptOptionalMarkdown("Voice profile (voice.md)", "voice");
   const reference = await promptReference();
@@ -126,12 +179,14 @@ async function wizard(): Promise<boolean> {
   const result = await applySetup({
     name,
     typesafeKey,
-    groqKey,
+    provider: providerSpec.id,
+    genModel,
+    providerKey,
     voiceMd,
     referencePlatform: reference?.platform,
     referenceMd: reference?.content,
   });
-  p.outro(`Setup saved — config: ${result.configPath}\nKeys: ${result.envPath}\nTry it: postdiff generate --x`);
+  p.outro(`Setup saved — ${providerSpec.label} · ${genModel}\nconfig: ${result.configPath}\nKeys: ${result.envPath}\nTry it: postdiff generate --x`);
   return true;
 }
 
@@ -139,8 +194,8 @@ async function run(_ctx: CommandContext): Promise<void> {
   await runSetupWizard();
 }
 
-export const command: TractCommand = {
+export const command: PostdiffCommand = {
   name: "setup",
-  description: "first-run or update setup: name, API keys, optional voice/reference",
+  description: "first-run or update setup: name, provider/model/key, optional voice/reference",
   run,
 };
