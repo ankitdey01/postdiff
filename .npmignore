@@ -1,0 +1,24 @@
+# Dev-only files — never published to npm.
+# NOTE: when .npmignore exists, npm ignores .gitignore entirely,
+# so runtime-ignored paths that must also stay out of the tarball
+# are re-listed here (node_modules, .env, .devtools).
+
+# Authoring sources — the published CLI runs from dist/
+src/
+tsconfig.json
+
+# Vendored agent skills — dev-time reference only
+.agents/
+
+# Repo docs not needed at runtime (README.md, PRD.md, CHANGELOG.md ship)
+docs/
+AGENTS.md
+CONTEXT.md
+skills-lock.json
+
+# Local-only runtime artifacts (including dotenv variants like .env.local)
+.devtools/
+.freebuff/
+.env*
+
+node_modules/

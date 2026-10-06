@@ -25,7 +25,6 @@
     "dependencies": {
         "@ai-sdk/anthropic": "^4.0.72",
         "@ai-sdk/deepseek": "^3.0.59",
-        "@ai-sdk/devtools": "^1.0.24",
         "@ai-sdk/fireworks": "^3.0.66",
         "@ai-sdk/google": "^4.0.88",
         "@ai-sdk/groq": "^4.0.46",
@@ -36,13 +35,14 @@
         "@ai-sdk/xai": "^5.0.15",
         "@clack/prompts": "^1.8.1",
         "@openrouter/ai-sdk-provider": "^3.1.0",
-        "@typesafe-ai/sdk": "latest",
+        "@typesafe-ai/sdk": "0.6.0",
         "ai": "^7.0.107",
         "clipboardy": "^5.3.2",
         "commander": "^15.0.0",
         "zod": "^4.6.5"
     },
     "devDependencies": {
+        "@ai-sdk/devtools": "^1.0.24",
         "@types/node": "^22.20.4",
         "typescript": "^5.6.3"
     }

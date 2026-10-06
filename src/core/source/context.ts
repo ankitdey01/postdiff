@@ -3,7 +3,7 @@
 // Saved per slug/sha under ~/.postdiff and reused: same sha => same context.
 
 import { join } from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { getCommitPayload, getFileStatuses, getParentMessage, readFileAtCommit, resolveSha } from "./git.js";
 import { isIgnoredPath } from "./ignore.js";
 import { getRepoSlug, getPostdiffHome } from "../store.js";
@@ -155,7 +155,8 @@ export async function saveCommitContext(home: string, slug: string, context: Com
   const path = contextPath(home, slug, context.sha);
   await mkdir(join(home, "repos", slug, context.sha), { recursive: true });
   const cached: CachedContext = { schema: CONTEXT_SCHEMA, savedAt: new Date().toISOString(), context };
-  await writeFile(path, JSON.stringify(cached, null, 2) + "\n", "utf8");
+  await writeFile(path, JSON.stringify(cached, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+  await chmod(path, 0o600); // mode above applies at creation only — tighten existing files too
   return path;
 }
 

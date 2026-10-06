@@ -5,7 +5,7 @@
 // discriminated result the caller maps to its own output surface.
 
 import { join } from "node:path";
-import { writeFile } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 import { loadOrGatherCommitContext, saveCommitContext, cleanText } from "../source/context.js";
 import { readFileAtCommit } from "../source/git.js";
 import { getRepoSlug, getPostdiffHome, loadConfig, saveMeta, hashDiff, type DraftMeta } from "../store.js";
@@ -21,8 +21,8 @@ import { readPreferenceFile, splitPreferenceRules, platformPreferenceFile } from
 import { readReviewState, initReview } from "../delivery/review.js";
 import { SdkGenerator, platformDraftFile } from "./generator.js";
 import { getProviderSpec } from "./providers.js";
-import { MIN_SUMMARY_CHARS, SUMMARY_SCHEMA, hashSummaryInput, loadSummary, renderSummary, saveSummary } from "../summary/summary.js";
-import type { DraftResult, GeneratorOptions } from "./generator.js";
+import { SUMMARY_SCHEMA, hashSummaryInput, loadSummary, renderSummary, saveSummary } from "../summary/summary.js";
+import type { DraftResult } from "./generator.js";
 import type { Platform } from "../../shared/types.js";
 import type { Telemetry } from "ai";
 
@@ -210,7 +210,11 @@ export async function generatePipeline(
 
   // 7. Resolve the cached change brief (built once per sha, always used).
   // Writer never sees the raw diff — only this brief.
+  // Single generator for summary + draft: buildSummary/complete never attach
+  // tools, so webSearch here only affects the draft stream below — one
+  // spec.load() per run instead of two on --web.
   const generator = new SdkGenerator(providerId, genKey, config.models.genModel, {
+    webSearch: webActive,
     ...(input.telemetry.length > 0 ? { telemetry: input.telemetry } : {}),
   });
   const summaryInputHash = hashSummaryInput({ diff: genDiff, commitMessage: context.commitMessage, readme });
@@ -246,8 +250,8 @@ export async function generatePipeline(
       throw new Error(`summary failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     const rendered = renderSummary(built);
-    if (rendered.length < MIN_SUMMARY_CHARS) {
-      throw new Error(`summary failed: brief too short (${rendered.length} chars)`);
+    if (!rendered.trim()) {
+      throw new Error(`summary failed: brief came back empty`);
     }
     await saveSummary(home, slug, {
       schema: SUMMARY_SCHEMA,
@@ -263,9 +267,7 @@ export async function generatePipeline(
 
   // 8. Generate draft from the brief (summary-only — no raw diff in prompt).
   emit({ kind: "drafting", message: `drafting ${platform} (streaming${webActive ? ", web search on" : ""}) —` });
-  const opts: GeneratorOptions = { webSearch: webActive, ...(input.telemetry.length > 0 ? { telemetry: input.telemetry } : {}) };
-  const draftGenerator = webActive ? new SdkGenerator(providerId, genKey, config.models.genModel, opts) : generator;
-  const draft = await draftGenerator.generateStream(
+  const draft = await generator.generateStream(
     { platform, context, summary: brief, voiceDefault, voicePlatform, reference, globalPreferences, readme },
     onChunk,
   );
@@ -291,16 +293,19 @@ export async function generatePipeline(
 
   const genJsonPath = join(dir, `gen-${platform}.json`);
   if (!draft.body.trim()) {
-    await writeFile(genJsonPath, JSON.stringify({ ...genPayload, error: "empty draft — no text in final step" }, null, 2) + "\n", "utf8");
+    await writeFile(genJsonPath, JSON.stringify({ ...genPayload, error: "empty draft — no text in final step" }, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+    await chmod(genJsonPath, 0o600); // mode above applies at creation only — tighten existing files too
     return { status: "empty-draft", draft, metaDir: dir, genPayloadPath: genJsonPath };
   }
 
   const draftText = draft.body.endsWith("\n") ? draft.body : draft.body + "\n";
   const draftPath = join(dir, platformDraftFile(platform));
   await Promise.all([
-    writeFile(draftPath, draftText, "utf8"),
-    writeFile(genJsonPath, JSON.stringify(genPayload, null, 2) + "\n", "utf8"),
+    writeFile(draftPath, draftText, { encoding: "utf8", mode: 0o600 }),
+    writeFile(genJsonPath, JSON.stringify(genPayload, null, 2) + "\n", { encoding: "utf8", mode: 0o600 }),
   ]);
+  // mode above applies at creation only — tighten existing files too
+  await Promise.all([chmod(draftPath, 0o600), chmod(genJsonPath, 0o600)]);
 
   // 10. Init review lineage
   await initReview(dir, platform, draftText);

@@ -71,7 +71,9 @@ export function splitDiffSections(shapedDiff: string): DiffSection[] {
   const sections: DiffSection[] = [];
   let current: string[] | null = null;
   let path = "(preamble)";
-  let ignoredSection = false;
+  // Preamble (text before the first `diff --git` header) is not a file:
+  // always kept, never sent to Jev.
+  let ignoredSection = true;
   const flush = () => {
     if (current !== null) sections.push({ path, section: current.join("\n"), ignored: ignoredSection });
   };

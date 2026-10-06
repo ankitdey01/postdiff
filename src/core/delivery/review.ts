@@ -5,7 +5,7 @@
 
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, readFile, rm, writeFile } from "node:fs/promises";
 import type { Platform } from "../../shared/types.js";
 import type { Generator } from "../generation/generator.js";
 import { MAX_RULE_CHARS, truncateRule } from "../generation/generator.js";
@@ -90,7 +90,9 @@ export async function readReviewState(dir: string, platform: Platform): Promise<
 }
 
 async function writeReviewState(dir: string, platform: Platform, state: ReviewState): Promise<void> {
-  await writeFile(reviewPath(dir, platform), JSON.stringify(state, null, 2) + "\n", "utf8");
+  const path = reviewPath(dir, platform);
+  await writeFile(path, JSON.stringify(state, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+  await chmod(path, 0o600); // mode above applies at creation only — tighten existing files too
 }
 
 /** Fresh lineage: first snapshot, pending. Also the regenerate reset. */

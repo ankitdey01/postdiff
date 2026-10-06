@@ -111,11 +111,20 @@ export function isDevtoolsEnabled(opts: Record<string, unknown>): boolean {
  * Loads the DevTools telemetry integration on demand. Returns [] when disabled
  * so call sites pass it straight through. Dynamic import keeps normal runs
  * free of the devtools package.
+ *
+ * @ai-sdk/devtools is a devDependency (never published to npm): when it is
+ * not installed — e.g. a global `postdiff` install — capture degrades to a
+ * warning and the run continues without telemetry.
  */
 export async function loadDevtoolsTelemetry(enabled: boolean): Promise<Telemetry[]> {
   if (!enabled) return [];
-  const { DevToolsTelemetry } = await import("@ai-sdk/devtools");
-  return [DevToolsTelemetry()];
+  try {
+    const { DevToolsTelemetry } = await import("@ai-sdk/devtools");
+    return [DevToolsTelemetry()];
+  } catch {
+    p.log.warn("--devtools needs @ai-sdk/devtools, which is dev-only and not bundled with postdiff. Continuing without capture.");
+    return [];
+  }
 }
 
 /** Hint printed when a run was captured. Viewer itself runs separately. */

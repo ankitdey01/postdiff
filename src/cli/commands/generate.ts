@@ -1,4 +1,4 @@
-// `postdiff generate` — thin CLI wrapper; all logic lives in core/generation/index.ts.
+// `postdiff generate` — thin CLI wrapper; all logic lives in core/generation/pipeline.ts (orchestration) + generator.ts (SDK wrapper).
 // Clack UI: one intro/outro per run, one spinner for the pre-stream phases
 // (context → Jev gate → filter). The spinner stops before the token stream
 // starts — writing chunks while a gutter is live is what broke the vertical

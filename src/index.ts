@@ -77,6 +77,7 @@ export type { ReviewStatus, ReviewVersion, ReviewState, VerdictInput, VerdictOut
 export { preparePublish } from "./core/delivery/publish.js";
 export type { PublishReady } from "./core/delivery/publish.js";
 export { assemblePrompt } from "./core/generation/assemble.js";
-export { SUMMARY_SCHEMA, MIN_SUMMARY_CHARS, SummarySchema, hashSummaryInput, loadSummary, saveSummary, renderSummary } from "./core/summary/summary.js";
-export type { CommitSummary, CachedSummary } from "./core/summary/summary.js";export { platformSpec, X_SPEC, LINKEDIN_SPEC, BLOG_SPEC } from "./core/generation/platforms.js";
+export { SUMMARY_SCHEMA, SummarySchema, hashSummaryInput, loadSummary, saveSummary, renderSummary } from "./core/summary/summary.js";
+export type { CommitSummary, CachedSummary } from "./core/summary/summary.js";
+export { platformSpec, X_SPEC, LINKEDIN_SPEC, BLOG_SPEC } from "./core/generation/platforms.js";
 export type { PlatformSpec } from "./core/generation/platforms.js";

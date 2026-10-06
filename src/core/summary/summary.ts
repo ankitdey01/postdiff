@@ -4,14 +4,11 @@
 
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { z } from "zod";
 
 /** Schema tag on summary.json: bump when the brief shape changes. */
 export const SUMMARY_SCHEMA = 1;
-
-/** Minimum rendered brief length; below this the summarizer failed. */
-export const MIN_SUMMARY_CHARS = 500;
 
 export const SummarySchema = z.object({
   overview: z.string().describe("2-4 sentences: what this commit does, end to end."),
@@ -71,7 +68,8 @@ export async function loadSummary(home: string, slug: string, sha: string): Prom
 export async function saveSummary(home: string, slug: string, cached: CachedSummary): Promise<string> {
   const path = summaryPath(home, slug, cached.sha);
   await mkdir(join(home, "repos", slug, cached.sha), { recursive: true });
-  await writeFile(path, JSON.stringify(cached, null, 2) + "\n", "utf8");
+  await writeFile(path, JSON.stringify(cached, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+  await chmod(path, 0o600); // mode above applies at creation only — tighten existing files too
   return path;
 }
 
