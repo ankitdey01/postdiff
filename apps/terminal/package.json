@@ -1,0 +1,31 @@
+{
+  "name": "postdiff",
+  "version": "0.0.1",
+  "description": "Postdiff terminal surface — CLI commands plus fullscreen TUI, in your voice.",
+  "homepage": "https://github.com/ankitdey01/postdiff#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ankitdey01/postdiff.git",
+    "directory": "apps/terminal"
+  },
+  "license": "ISC",
+  "author": "ankitdey01",
+  "type": "module",
+  "bin": {
+    "postdiff": "./dist/main.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "node --no-warnings=ExperimentalWarning ./dist/main.js",
+    "start": "node ./dist/main.js"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "@postdiff/core": "^0.0.1",
+    "ai": "^7.0.107",
+    "clipboardy": "^5.3.2",
+    "commander": "^15.0.0"
+  }
+}

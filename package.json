@@ -1,49 +1,18 @@
 {
-    "name": "postdiff",
-    "version": "0.0.1",
-    "description": "A engine to turn commits into articles and blogs",
-    "homepage": "https://github.com/ankitdey01/postdiff#readme",
-    "bugs": {
-        "url": "https://github.com/ankitdey01/postdiff/issues"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/ankitdey01/postdiff.git"
-    },
-    "license": "ISC",
-    "author": "ankitdey01",
-    "type": "module",
-    "bin": {
-        "postdiff": "./dist/cli/main.js"
-    },
-    "scripts": {
-        "build": "tsc -p tsconfig.json",
-        "dev": "node --no-warnings=ExperimentalWarning ./dist/cli/main.js",
-        "start": "node ./dist/cli/main.js",
-        "typecheck": "tsc --noEmit -p tsconfig.json"
-    },
-    "dependencies": {
-        "@ai-sdk/anthropic": "^4.0.72",
-        "@ai-sdk/deepseek": "^3.0.59",
-        "@ai-sdk/fireworks": "^3.0.66",
-        "@ai-sdk/google": "^4.0.88",
-        "@ai-sdk/groq": "^4.0.46",
-        "@ai-sdk/mistral": "^4.0.57",
-        "@ai-sdk/openai": "^4.0.84",
-        "@ai-sdk/provider-utils": "^5.0.54",
-        "@ai-sdk/togetherai": "^3.0.64",
-        "@ai-sdk/xai": "^5.0.15",
-        "@clack/prompts": "^1.8.1",
-        "@openrouter/ai-sdk-provider": "^3.1.0",
-        "@typesafe-ai/sdk": "0.6.0",
-        "ai": "^7.0.107",
-        "clipboardy": "^5.3.2",
-        "commander": "^15.0.0",
-        "zod": "^4.6.5"
-    },
-    "devDependencies": {
-        "@ai-sdk/devtools": "^1.0.24",
-        "@types/node": "^22.20.4",
-        "typescript": "^5.6.3"
-    }
+  "name": "postdiff-root",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Postdiff monorepo — engine in packages/core, terminal surface (CLI + TUI) in apps/terminal. Web/VSCode land later as private apps and never touch the published tarball.",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "tsc -b packages/core apps/terminal",
+    "typecheck": "tsc -b packages/core apps/terminal --dry",
+    "dev:cli": "npm -w postdiff run dev",
+    "clean": "node -e \"for (const d of ['packages/core/dist','apps/terminal/dist','dist']) { try { require('fs').rmSync(d, {recursive:true,force:true}); console.log('removed', d) } catch {} }\""
+  },
+  "devDependencies": {
+    "@ai-sdk/devtools": "^1.0.24",
+    "@types/node": "^22.20.4",
+    "typescript": "^5.6.3"
+  }
 }

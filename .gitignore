@@ -1,5 +1,7 @@
 node_modules/
 dist/
-.env
+*.tsbuildinfo
+*.tgz
+.env*
 .devtools/
 .freebuff
