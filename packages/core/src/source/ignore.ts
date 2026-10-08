@@ -25,9 +25,10 @@ export const IGNORED_SUFFIXES: readonly string[] = [".map", ".lock"];
 /** True when a repo-relative path is noise: content collapses, filename stays. */
 export function isIgnoredPath(path: string): boolean {
   const p = path.replace(/^\.\//, "");
-  if (IGNORED_FILES.includes(p.split("/").pop() ?? "")) return true;
+  const base = p.split("/").pop() ?? "";
+  if (IGNORED_FILES.includes(base)) return true;
   if (IGNORED_SUFFIXES.some((s) => p.endsWith(s))) return true;
-  if (p === ".env" || p.startsWith(".env.")) return true;
+  if (base === ".env" || base.startsWith(".env.")) return true;
   return IGNORED_DIR_PREFIXES.some((d) => p === d.slice(0, -1) || p.startsWith(d));
 }
 

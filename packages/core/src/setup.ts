@@ -5,7 +5,7 @@
 // wizard never leaves a partial install on disk.
 
 import { TypeSafeClient } from "@typesafe-ai/sdk";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { generateText } from "ai";
 import { overwriteVoiceSample } from "./profile/voice.js";
 import { overwriteReferenceExample, platformReferenceFile } from "./profile/reference.js";
@@ -93,8 +93,11 @@ async function writeEnvFile(envPath: string, wanted: Array<[string, string]>): P
   let lines: string[] = [];
   try {
     lines = (await readFile(envPath, "utf8")).split(/\r?\n/);
-  } catch {
-    // No existing file — start fresh.
+  } catch (err) {
+    // No existing file — start fresh. Any other read error (permissions,
+    // directory, …) is rethrown so the rename below cannot replace an
+    // unreadable file and silently discard entries outside `wanted`.
+    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") throw err;
   }
   for (const [key, rawValue] of wanted) {
     const value = rawValue.trim();
@@ -142,13 +145,27 @@ export async function applySetup(answers: SetupAnswers): Promise<SetupResult> {
   const configPath = getConfigPath();
   const tmp = `${configPath}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, JSON.stringify(config, null, 2) + "\n", "utf8");
-  await rename(tmp, configPath);
 
+  // Profile writes before the sentinel rename: config.json must only appear
+  // once they succeeded. Snapshots restore partial profile changes when a
+  // later write fails while updating an existing setup.
   const voice = (answers.voiceMd ?? "").trim();
-  if (voice) await overwriteVoiceSample(`${home}/voice`, "voice.md", voice);
   const reference = (answers.referenceMd ?? "").trim();
-  if (reference && answers.referencePlatform) {
-    await overwriteReferenceExample(`${home}/reference`, platformReferenceFile(answers.referencePlatform), reference);
+  const voicePath = `${home}/voice/voice.md`;
+  const referencePath = reference && answers.referencePlatform ? `${home}/reference/${platformReferenceFile(answers.referencePlatform)}` : null;
+  const voiceBackup = voice ? await readFile(voicePath, "utf8").catch(() => "") : null;
+  const referenceBackup = referencePath ? await readFile(referencePath, "utf8").catch(() => "") : null;
+  try {
+    if (voice) await overwriteVoiceSample(`${home}/voice`, "voice.md", voice);
+    if (reference && answers.referencePlatform) {
+      await overwriteReferenceExample(`${home}/reference`, platformReferenceFile(answers.referencePlatform), reference);
+    }
+    await rename(tmp, configPath);
+  } catch (err) {
+    if (voiceBackup !== null) await writeFile(voicePath, voiceBackup, "utf8").catch(() => {});
+    if (referenceBackup !== null && referencePath) await writeFile(referencePath, referenceBackup, "utf8").catch(() => {});
+    await unlink(tmp).catch(() => {});
+    throw err;
   }
 
   return { home, configPath, envPath };

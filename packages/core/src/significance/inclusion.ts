@@ -53,7 +53,7 @@ export class JevInclusionJudge implements InclusionJudge {
         };
       });
       const response = await client.systemOne({
-        state: { files: sections.map((s) => s.path) },
+        state: { files: chunk.map((s) => s.path) },
         questions,
         model: this.model,
       });

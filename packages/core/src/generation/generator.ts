@@ -237,11 +237,13 @@ export class SdkGenerator implements Generator {
   }
 
   async complete(system: string, prompt: string): Promise<string> {
+    const runtime = await this.runtime();
     const result = await generateText({
-      model: (await this.runtime()).model(this.model),
+      model: runtime.model(this.model),
       system,
       prompt,
       telemetry: this.telemetryFor("complete"),
+      providerOptions: runtime.providerOptions,
     });
     return result.text.trim();
   }
@@ -258,9 +260,10 @@ export class SdkGenerator implements Generator {
       "Diff:",
       input.diff || "(empty diff)",
     ].join("\n");
+    const runtime = await this.runtime();
     const attempt = async (): Promise<CommitSummary> => {
       const result = await generateText({
-        model: (await this.runtime()).model(this.model),
+        model: runtime.model(this.model),
         system: SUMMARY_SYSTEM,
         prompt,
         // Detailed brief needs room: without an explicit cap the provider
@@ -269,6 +272,7 @@ export class SdkGenerator implements Generator {
         maxOutputTokens: 10000,
         output: Output.object({ schema: SummarySchema }),
         telemetry: this.telemetryFor("build-summary"),
+        providerOptions: runtime.providerOptions,
       });
       return result.output;
     };
@@ -284,13 +288,15 @@ export class SdkGenerator implements Generator {
   async summarizeAccept(oldContent: string, newContent: string): Promise<string> {
     const system = PREFERENCE_SYSTEM;
     const prompt = ["OLD DRAFT (what the model wrote):", oldContent, "", "NEW DRAFT (the author's edited version):", newContent].join("\n");
+    const runtime = await this.runtime();
     try {
       const result = await generateText({
-        model: (await this.runtime()).model(this.model),
+        model: runtime.model(this.model),
         system,
         prompt,
         output: Output.object({ schema: AcceptRuleSchema }),
         telemetry: this.telemetryFor("summarize-accept"),
+        providerOptions: runtime.providerOptions,
       });
       return truncateRule(result.output.rule);
     } catch {
@@ -303,13 +309,15 @@ export class SdkGenerator implements Generator {
   async distillReject(reason: string): Promise<string> {
     const system = REJECT_RULE_SYSTEM;
     const prompt = ["USER COMPLAINT (free-form, may be vague or misspelled):", reason].join("\n");
+    const runtime = await this.runtime();
     try {
       const result = await generateText({
-        model: (await this.runtime()).model(this.model),
+        model: runtime.model(this.model),
         system,
         prompt,
         output: Output.object({ schema: RejectRuleSchema }),
         telemetry: this.telemetryFor("distill-reject"),
+        providerOptions: runtime.providerOptions,
       });
       const rule = truncateRule(result.output.rule);
       // Model found nothing generalizable — keep the author's own words.

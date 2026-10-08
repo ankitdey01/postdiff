@@ -8,7 +8,7 @@ export const IS_SIGNIFICANT_INSTRUCTIONS = "Is this change worth posting about?"
 
 export const IS_SIGNIFICANT_CRITERIA = {
   true: "User-visible feature, bug fix with user impact, performance win, or noteworthy refactor, worth writing about in public as a small post",
-  false: "Formatting-only, lockfile-only, typo-only, WIP, or generated noise, anything that doesn't or isn't worth publically publishing about",
+  false: "Formatting-only, lockfile-only, typo-only, WIP, or generated noise, anything that doesn't or isn't worth publicly publishing about",
 } as const;
 
 /* ---------------- per-file inclusion filter (Jev Noul, one call, many questions) ---------------- */

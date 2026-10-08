@@ -11,6 +11,7 @@ import { ensurePostdiffHome, getConfigPath } from "@postdiff/core";
 import { runProgram } from "./router.js";
 import { runSetupWizard } from "./commands/setup.js";
 import { bootstrapEnv } from "./keys.js";
+import { isInteractive } from "./ui.js";
 
 /**
  * First-run sentinel: config.json missing + a command that needs API keys +
@@ -24,7 +25,7 @@ async function maybeFirstRunSetup(argv: string[]): Promise<boolean> {
   const invoked = argv[2] ?? "";
   if (invoked !== "generate" && invoked !== "review") return false;
   if (argv.includes("--help") || argv.includes("-h")) return false;
-  if (!process.stdout.isTTY) return false;
+  if (!isInteractive()) return false;
   try {
     await stat(getConfigPath());
     return false; // config exists — setup already done
