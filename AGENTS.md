@@ -3,7 +3,7 @@
 The following instrucions and PRD.md doesnt solely represent the final product. You have complete right to cross question me and suggest me better workaround if needed and valid. Remember one thing, we dont need to build everything from scratch, thats not the point, there will be better already created specific tools and libraries for specific tasks that needs to be done. You should always find and suggest those to me. 
 Below is just a rough sketch of the overall product.
 
-`PRD.md` is the single source of truth for product, design flow, and decisions. `README.md` holds the system diagram. Read them before coding. Stack is decided: TypeScript + Node (see `package.json`, `tsconfig.json`, `src/`). Do not re-litigate it; decide only what is still open during build.
+`PRD.md` is the single source of truth for product, design flow, and decisions. `README.md` holds the system diagram. Read them before coding. Stack is decided: TypeScript + Node monorepo (see root `package.json` workspaces, `tsconfig.base.json`, `packages/core/src/` for the engine, `apps/terminal/src/` for the CLI+TUI). Do not re-litigate it; decide only what is still open during build.
 
 ## Coding Rule
 
@@ -11,14 +11,14 @@ Don't overcomplicate, instead do smart engineering changes. Dont over engineer s
 
 ## Current state
 
-All seven CLI commands implemented: `postdiff context`, `postdiff generate`, `postdiff voice`, `postdiff review`, `postdiff reference`, `postdiff preferences`, `postdiff publish`. Significance (Jev gate + per-file inclusion filter), generation (Vercel AI SDK over a 10-provider registry in `src/core/generation/providers.ts` — groq default; provider + model in `config.json`; server-side web search strictly opt-in via `generate --web`, off by default, warn + tool-free fallback when unsupported), review (accept/reject with LLM rule distillation), publish (clipboard copy-only). Test/eval harness deferred (PRD §14.9). Do not assume test/lint/CI commands exist.
+All eight CLI commands implemented: `postdiff setup`, `postdiff context`, `postdiff generate`, `postdiff voice`, `postdiff review`, `postdiff reference`, `postdiff preferences`, `postdiff publish`. Significance (Jev gate + per-file inclusion filter, shared plumbing in `packages/core/src/significance/jev.ts`), generation (Vercel AI SDK over a 10-provider registry in `packages/core/src/generation/providers.ts` — groq default; provider + model in `config.json`; server-side web search strictly opt-in via `generate --web`, off by default, warn + tool-free fallback when unsupported), review (accept/reject with LLM rule distillation; rule caps in `packages/core/src/shared/rules.ts`), publish (clipboard copy-only). Terminal UI helpers (`isInteractive`, intro/outro discipline) live in `apps/terminal/src/ui.ts`; a `tui/` stub reserves the bare-`postdiff` fullscreen slot. Test/eval harness deferred (PRD §14.9). Do not assume test/lint/CI commands exist.
 
 ## Design flow (from PRD §8)
 
 Capability pipeline, in order: diff/commit extraction → significance filter (Jev gate + per-file inclusion) → context building (commit message + parent + shaped diff + file contents; cached per sha) → generation (voice, reference, preferences loaded fresh per call) → human review → publish (copy-only) → feedback via preference rules.
 
 - Engine is UI-agnostic: interfaces call it, it never depends on them. Simplest terminal-native surface ships first; editor integration later.
-- LLM provider: Vercel AI SDK over the provider registry (`src/core/generation/providers.ts`): groq, openai, anthropic, google, xai, mistral, deepseek, openrouter, together, fireworks. Provider + `genModel` live in `config.json`; each provider declares its env key, curated models, and whether its server-side web search applies (groq: gpt-oss only). Web-search tools are provider-executed and never SDK-visible, attaching only under `generate --web` (off by default). Secrets passed into the engine as inputs, never read inside it.
+- LLM provider: Vercel AI SDK over the provider registry (`packages/core/src/generation/providers.ts`): groq, openai, anthropic, google, xai, mistral, deepseek, openrouter, together, fireworks. Provider + `genModel` live in `config.json`; each provider declares its env key, curated models, and whether its server-side web search applies (groq: gpt-oss only). Web-search tools are provider-executed and never SDK-visible, attaching only under `generate --web` (off by default). Secrets passed into the engine as inputs, never read inside it.
 - Coverage lives where the logic lives (significance, context, generation, voice/feedback).
 
 ## Build discipline (non-negotiable workflow)
@@ -46,7 +46,7 @@ Build one capability slice at a time, then stop. Verify it live with the user be
 
 ## Environment variables
 
-Loaded from `cwd/.env` if not already set. No dotenv dependency — hand-rolled loader in `src/cli/main.ts`.
+Loaded from `cwd/.env` if not already set. No dotenv dependency — hand-rolled loader in `apps/terminal/src/main.ts` (`bootstrapEnv` in `apps/terminal/src/keys.ts`).
 
 - `TYPESAFE_API_KEY` — TypeSafe Jev API key for significance judgments
 - Provider key for generation — the env var is per provider: `GROQ_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `XAI_API_KEY`, `MISTRAL_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`, `TOGETHER_API_KEY`, `FIREWORKS_API_KEY` (chosen in `postdiff setup`)

@@ -2,7 +2,7 @@
 
 Turns your git commits into ready-to-post content — blog, X, LinkedIn (YouTube script deferred to post-v1) — in your own voice.
 
-CLI tool ships as `postdiff`. All slices implemented: context, generate, voice, review, reference, preferences, publish.
+CLI tool ships as `postdiff` (terminal app in `apps/terminal`, engine in `packages/core` published as `@postdiff/core`). All eight commands implemented: setup, context, generate, voice, review, reference, preferences, publish.
 
 ## Install & setup
 

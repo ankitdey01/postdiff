@@ -1,10 +1,9 @@
 // Engine: Jev per-file inclusion filter (stage 2). ONE systemOne call, one
 // Noul question per file section. Secrets (apiKey) passed in, never read here.
 
-import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { IS_INCLUDE_CRITERIA, IS_INCLUDE_INSTRUCTIONS } from "../prompts.js";
 import { splitDiffSections } from "../source/ignore.js";
-import { withTimeout } from "../async.js";
+import { JEV_MODEL_DEFAULT, createJevClient, extractNoul, jevErrorReason, withJevTimeout } from "./jev.js";
 
 export { IS_INCLUDE_CRITERIA, IS_INCLUDE_INSTRUCTIONS } from "../prompts.js";
 
@@ -18,8 +17,6 @@ export const MAX_INCLUDE_SECTION_CHARS = 4_000;
 
 /** Defensive chunking: max per-file questions per systemOne call. */
 export const MAX_INCLUDE_QUESTIONS_PER_CALL = 30;
-
-const INCLUSION_TIMEOUT_MS = 30_000;
 
 export interface InclusionJudge {
   judgeFiles(sections: { path: string; diff: string }[]): Promise<Record<number, number>>;
@@ -35,11 +32,11 @@ interface InclusionQuestion {
 export class JevInclusionJudge implements InclusionJudge {
   constructor(
     private readonly apiKey: string,
-    private readonly model: string = "jev-latest"
+    private readonly model: string = JEV_MODEL_DEFAULT
   ) {}
 
   async judgeFiles(sections: { path: string; diff: string }[]): Promise<Record<number, number>> {
-    const client = new TypeSafeClient({ apiKey: this.apiKey });
+    const client = createJevClient(this.apiKey);
     const out: Record<number, number> = {};
     for (let c = 0; c < sections.length; c += MAX_INCLUDE_QUESTIONS_PER_CALL) {
       const chunk = sections.slice(c, c + MAX_INCLUDE_QUESTIONS_PER_CALL);
@@ -58,9 +55,7 @@ export class JevInclusionJudge implements InclusionJudge {
         model: this.model,
       });
       chunk.forEach((_, k) => {
-        const noul = response.answers?.[`include_file_${c + k}`]?.noul;
-        if (typeof noul !== "number" || Number.isNaN(noul)) throw new Error(`Jev returned no noul for file index ${c + k}`);
-        out[c + k] = noul;
+        out[c + k] = extractNoul(response.answers?.[`include_file_${c + k}`], `file index ${c + k}`);
       });
     }
     return out;
@@ -111,9 +106,8 @@ export async function filterShapedDiff(
 
   const nouls = new Map<number, number | null>();
   try {
-    const raw = await withTimeout(
+    const raw = await withJevTimeout(
       opts.judge.judgeFiles(judgeable.map((s) => ({ path: s.path, diff: s.section }))),
-      INCLUSION_TIMEOUT_MS
     );
     // judgeFiles answers in judgeable order; map back to section indexes.
     let k = 0;
@@ -123,7 +117,7 @@ export async function filterShapedDiff(
       k++;
     }
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+    const reason = jevErrorReason(err);
     const all = new Set(sections.map((_, i) => i));
     return {
       filtered: shapedDiff,

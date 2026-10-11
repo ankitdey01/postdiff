@@ -6,6 +6,7 @@
 import * as p from "@clack/prompts";
 import { applySetup, pingProviderKey, pingTypesafeKey, loadConfig, PROVIDERS, getProviderSpec, type Platform, type ProviderSpec } from "@postdiff/core";
 import { resolveKeys } from "../keys.js";
+import { showBigText } from "../big-text.js";
 import type { CommandContext, PostdiffCommand } from "../router.js";
 
 const TYPESAFE_KEYS_URL = "https://console.typesafe.ai/keys";
@@ -142,6 +143,8 @@ async function wizard(): Promise<boolean> {
   const config = await loadConfig();
   const currentUser = config.user.name;
 
+  // Block-letter banner first (raw stdout); the Clack session opens after it.
+  await showBigText("postdiff");
   p.intro("postdiff setup");
   p.note(
     "name      → ~/.postdiff/config.json\nAPI keys  → ~/.postdiff/.env (never in config.json)\nvoice/reference → ~/.postdiff/{voice,reference}/",

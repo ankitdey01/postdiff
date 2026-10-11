@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { chmod, readFile, rm, writeFile } from "node:fs/promises";
 import type { Platform } from "../shared/types.js";
 import type { Generator } from "../generation/generator.js";
-import { MAX_RULE_CHARS, truncateRule } from "../generation/generator.js";
+import { truncateRule } from "../shared/rules.js";
 
 export type ReviewStatus = "pending" | "accepted";
 

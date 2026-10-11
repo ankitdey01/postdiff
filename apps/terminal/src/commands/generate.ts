@@ -8,6 +8,7 @@ import * as p from "@clack/prompts";
 import { generatePipeline } from "@postdiff/core";
 import type { CommandContext, PostdiffCommand } from "../router.js";
 import { ensurePlatform, isDevtoolsEnabled, loadDevtoolsTelemetry, devtoolsHint } from "../helpers.js";
+import { createDotsStatus } from "../spinners.js";
 import { resolveKeys } from "../keys.js";
 import { uiIntro, uiOutro } from "../ui.js";
 
@@ -32,7 +33,9 @@ async function run(ctx: CommandContext): Promise<void> {
   const telemetry = await loadDevtoolsTelemetry(devtools);
 
   const keys = resolveKeys();
-  const spin = p.spinner();
+  // Dots-only live status (gallery "dots" art); message updates track the
+  // pre-stream phases. Stops before the token stream owns stdout.
+  const spin = createDotsStatus();
   spin.start("loading context…");
   let spinLive = true;
   const stopSpin = (msg: string) => {

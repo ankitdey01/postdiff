@@ -10,8 +10,11 @@ import type { CommitContext } from "../source/context.js";
 import type { Platform } from "../shared/types.js";
 import { assemblePrompt } from "./assemble.js";
 import { platformSpec } from "./platforms.js";
+import { MAX_RULE_CHARS, truncateRule } from "../shared/rules.js";
 import { PREFERENCE_SYSTEM, REJECT_RULE_SYSTEM, SUMMARY_SYSTEM } from "../prompts.js";
 import { SummarySchema, type CommitSummary } from "../summary/summary.js";
+
+export { MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule } from "../shared/rules.js";
 
 export interface SummaryInput {
   commitMessage: string;
@@ -89,16 +92,6 @@ export interface Generator {
    * because of this call.
    */
   distillReject(reason: string): Promise<string>;
-}
-
-/** Cap for a distilled global rule: 50 words, 300 chars, whichever binds first. */
-export const MAX_RULE_WORDS = 50;
-export const MAX_RULE_CHARS = 300;
-
-/** First-50-words-then-300-chars truncation, so over-long returns never bloat the file. */
-export function truncateRule(rule: string): string {
-  const words = rule.trim().split(/\s+/).filter(Boolean).slice(0, MAX_RULE_WORDS).join(" ");
-  return words.slice(0, MAX_RULE_CHARS).trim();
 }
 
 const AcceptRuleSchema = z.object({

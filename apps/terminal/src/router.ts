@@ -12,6 +12,7 @@ import { command as referenceCommand } from "./commands/reference.js";
 import { command as reviewCommand } from "./commands/review.js";
 import { command as setupCommand } from "./commands/setup.js";
 import { command as voiceCommand } from "./commands/voice.js";
+import { showNotFound } from "./not-found.js";
 
 export interface CommandContext {
   cwd: string;
@@ -67,9 +68,10 @@ export async function runProgram(argv: string[], cwd: string, version: string): 
     .version(version)
     .showHelpAfterError()
     .allowExcessArguments()
-    .action(() => {
+    .action(async () => {
       if (program.args.length > 0) {
-        program.error(`error: unknown command '${program.args[0]}'`, { exitCode: 1 });
+        await showNotFound(String(program.args[0]), ALL_COMMANDS.map((c) => c.name));
+        process.exitCode = 1;
         return;
       }
       program.outputHelp();

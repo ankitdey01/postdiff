@@ -5,6 +5,7 @@ export { resolveSha, getCommitPayload, truncateDiff, shapeDiffForJudge, splitDif
 export type { FileStatus, DiffSection } from "./source/git.js";
 export { JevSignificanceJudge, judgeSignificance } from "./significance/gate.js";
 export type { SignificanceInput, SignificanceResult, SignificanceJudge } from "./significance/gate.js";
+export { JEV_MODEL_DEFAULT, JEV_TIMEOUT_MS, createJevClient, extractNoul, jevErrorReason, withJevTimeout } from "./significance/jev.js";
 export { JevInclusionJudge, filterShapedDiff } from "./significance/inclusion.js";
 export type { InclusionJudge, FileInclusion, FilteredDiff } from "./significance/inclusion.js";
 export {
@@ -61,7 +62,8 @@ export {
 export { gatherCommitContext, loadOrGatherCommitContext, saveCommitContext, loadCommitContext } from "./source/context.js";
 export { cleanText, MAX_FILE_CHARS, MAX_TOTAL_CHARS, CONTEXT_SCHEMA } from "./source/context.js";
 export type { CommitContext, ContextFile, OmitReason } from "./source/context.js";
-export { SdkGenerator, GroqGenerator, platformDraftFile, MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule } from "./generation/generator.js";
+export { SdkGenerator, GroqGenerator, platformDraftFile } from "./generation/generator.js";
+export { MAX_RULE_WORDS, MAX_RULE_CHARS, truncateRule } from "./shared/rules.js";
 export type { GenerateInput, DraftResult, Generator, GeneratorOptions } from "./generation/generator.js";
 export { generatePipeline } from "./generation/pipeline.js";
 export type { PipelineInput, PipelineEvent, PipelineResult } from "./generation/pipeline.js";

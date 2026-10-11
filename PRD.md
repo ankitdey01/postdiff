@@ -1,6 +1,6 @@
 # Postdiff — Product Requirements Document
 
-**Status:** Pre-release. This document is the single source of truth for product, design flow, and decisions made so far. Implementation stack is TypeScript + Node (see `package.json`, `tsconfig.json`, `src/`); generation runs on the Vercel AI SDK over a 10-provider registry (`src/core/generation/providers.ts`, groq default), with provider + model swappable via config. CLI binary ships as `postdiff`.
+**Status:** Pre-release. This document is the single source of truth for product, design flow, and decisions made so far. Implementation is a TypeScript + Node monorepo (root `package.json` workspaces + `tsconfig.base.json`; engine in `packages/core/src/` published as `@postdiff/core`, terminal CLI+TUI in `apps/terminal/src/` published as `postdiff`); generation runs on the Vercel AI SDK over a 10-provider registry (`packages/core/src/generation/providers.ts`, groq default), with provider + model swappable via config. CLI binary ships as `postdiff`.
 
 ## 1. Name & Positioning
 
@@ -41,19 +41,18 @@ Solo/indie developers building in public with an existing or growing social pres
 ## 7. Core Features
 
 ### 7.0 First-run setup (decided)
-- **Trigger:** when `~/.postdiff/config.json` does not exist and the invoked command needs API keys (`generate`, `review`), the CLI runs an interactive setup wizard first — once, before `ensurePostdiffHome()` writes the skeleton. `--help`, `-h`, and every other command never hijack; non-TTY runs skip the wizard and surface normal missing-key errors. The wizard also exists as an explicit `postdiff setup` command for new installs and updates (pre-fills name, "enter to keep current" keys).
+- **Trigger:** when `~/.postdiff/config.json` does not exist and the invoked command needs API keys (`generate`, `review`), the CLI runs an interactive setup wizard first — once, before `ensurePostdiffHome()` writes the skeleton. `--help`, `-h`, and every other command never hijack; non-interactive runs (no stdin+stdout TTY, per `isInteractive()` in `apps/terminal/src/ui.ts`) skip the wizard and surface normal missing-key errors. The wizard also exists as an explicit `postdiff setup` command for new installs and updates (pre-fills name, "enter to keep current" keys).
 - **Prompts (clack `@clack/prompts`):** required `name` (cannot be skipped; signs drafts) → `TYPESAFE_API_KEY` (Jev; link https://console.typesafe.ai/keys) → **generation provider** (clack `select` over the registry: groq, openai, anthropic, google, xai, mistral, deepseek, openrouter, together, fireworks; preselects the configured one) → **model** (clack `select` of that provider's curated list + "custom model id…" free-text escape hatch) → the provider's API key (label + console URL from the registry, e.g. `GROQ_KEY` at console.groq.com/keys), **masked password prompts validated live** with one minimal API call against the selected model; bad key → error + re-prompt loop → optional multi-line `voice.md` paste (clack `multiline`; empty submit skips) and one optional reference example with a platform picker (reference files are per-platform; no `reference.md` concept). Preferences are not asked — they are LLM-distilled.
-- **Persistence (all-or-nothing):** nothing hits disk until every step completes; cancel mid-way writes nothing. On completion: restructured `config.json` (`{ version, user: { name }, models: { jevModel, threshold, provider, genModel } }`; legacy flat shape migrates in place), keys into `~/.postdiff/.env` (mode 0600, merge-keeps unrelated keys) — **never into config.json** (§8 rule intact) — and optional voice/reference content into the existing profile files.
+- **Persistence (all-or-nothing):** cancel mid-way writes nothing. On completion, profile seeds (voice/reference) write first, then `config.json` lands via atomic tmp-rename as the sentinel — it only appears once they succeeded; updating an existing setup snapshots prior profile content and restores it if a later write fails. Resulting `config.json` shape: `{ version, user: { name }, models: { jevModel, threshold, provider, genModel } }` (legacy flat shape migrates in place); keys go into `~/.postdiff/.env` (mode 0600, merge-keeps unrelated keys; an unreadable existing `.env` aborts instead of being overwritten) — **never into config.json** (§8 rule intact) — and optional voice/reference content into the existing profile files.
 - **Key resolution (single point, cli-only):** real env > `cwd/.env` > `~/.postdiff/.env`. `generate`/`review` no longer read `process.env` directly.
 - **Publishing:** package ships at 0.x with `bin: postdiff`; install is `npm i -g postdiff` (plain `npm i postdiff` does not put the binary on PATH).
 
-### 7.1 Trigger Layer
-- Git post-commit hook
-- Manual trigger command (exact syntax TBD)
-- Scheduled digest (future, not v1)
+### 7.1 Trigger Layer (decided: manual CLI for v1)
+- Manual trigger: `postdiff generate [<sha>]` (default HEAD) — the only v1 trigger
+- Git post-commit hook and scheduled digest: deferred, not v1
 
 ### 7.2 Significance Filter (decided)
-- **Stage 1 — whole-commit gate:** Single Jev Noul judgment (`is_significant`) over diff + commit-message state via `@typesafe-ai/sdk` (`jev-latest`). No heuristic pre-pass, no generic LLM prompt-parse step.
+- **Stage 1 — whole-commit gate:** Single Jev Noul judgment (`is_significant`) over diff + commit-message state via `@typesafe-ai/sdk` (`jev-latest`). No heuristic pre-pass, no generic LLM prompt-parse step. Shared Jev plumbing (client construction, 30s timeout, noul extraction, error reasons) lives in `packages/core/src/significance/jev.ts` and is used by both stages.
 - State: `{ diff, commitMessage, filesChanged }`. `diff` is shaped before judging: noise paths (`.agents/`, `node_modules/`, `dist/`, lockfiles, `.env`) collapse to filename-only; full filenames still reach Jev via `filesChanged`. Shaping trims input only — it never decides significance. Question: `Is this change worth posting about?` with `true`/`false` criteria pinning "worth posting" vs. trivial/noise.
 - Pass (`noul >= threshold`, default 0.5, tunable after dogfooding) → proceed. Fail → stop, log, wait for next trigger.
 - `postdiff generate --force` bypasses the judge entirely.
@@ -76,13 +75,13 @@ Solo/indie developers building in public with an existing or growing social pres
 ### 7.4 Generation (decided)
 - Input: committed diff + commit context + changed file contents + paired voice profile (`voice.md` + platform file) + reference examples + global preference rules + target platform
 - One platform per request via `postdiff generate [<sha>] [--force] [--blog|--x|--linkedin]` — no fan-out; each platform drafted separately on demand
-- Provider: Vercel AI SDK behind our own `Generator` interface (`SdkGenerator`), with the transport picked from the 10-provider registry (`src/core/generation/providers.ts`; OpenRouter via `@openrouter/ai-sdk-provider`). `models.provider` + `models.genModel` pinned in `~/.postdiff/config.json` (missing `provider` backfills as `groq` — no migration ceremony). The registry declares each provider's env key, keys URL, curated models, and web-search support; heavy SDK packages load lazily so non-generation commands stay fast. Default `groq` + `openai/gpt-oss-20b`. Single-stage: code-assembled prompt carries the full raw context — no prompt-builder model call. Accept-with-edit triggers a separate LLM call to distill a global preference rule (same provider/model as generation).
+- Provider: Vercel AI SDK behind our own `Generator` interface (`SdkGenerator`), with the transport picked from the 10-provider registry (`packages/core/src/generation/providers.ts`; OpenRouter via `@openrouter/ai-sdk-provider`). `models.provider` + `models.genModel` pinned in `~/.postdiff/config.json` (missing `provider` backfills as `groq` — no migration ceremony). The registry declares each provider's env key, keys URL, curated models, and web-search support; heavy SDK packages load lazily so non-generation commands stay fast. Default `groq` + `openai/gpt-oss-20b`. Single-stage: code-assembled prompt carries the full raw context — no prompt-builder model call. Accept-with-edit triggers a separate LLM call to distill a global preference rule (same provider/model as generation). Distilled-rule caps (`MAX_RULE_WORDS`/`MAX_RULE_CHARS`, `truncateRule`) live in `packages/core/src/shared/rules.ts`, shared by generation and review.
 - Web enrichment: strictly opt-in via `postdiff generate --web` (off by default — no tool attached, no search instruction in the prompt). Per-provider server-side search tool attached as `browser_search`, provider-executed (no extra key — billed to the same key; groq as tokens, anthropic per search). groq: browser search, gpt-oss models only; openai (Responses webSearch), anthropic (webSearch_20250305), google (googleSearch grounding), xai, openrouter (server webSearch; per underlying model): on when supported; mistral/deepseek/together/fireworks: none (their SDKs expose no server search). `--web` on an unsupported provider/model emits a visible warning and drafts without it, and a mid-call web failure retries tool-free once (warned) — never fatal, never a silent pass-through of an unsupported tool.
 - Blog format includes a configurable target word count; blog output is Markdown (links as `[text](url)`)
 
-### 7.5 Review
-- First surface: drafts shown in the terminal-native interface for review, with persistence to a local file
-- Later editor integration: panel with edit/approve/regenerate/reject actions
+### 7.5 Review (decided)
+- Terminal-native review: `postdiff review` displays the stored draft and records an `accepted` / `rejected` verdict in `review-<platform>.json`, bound to exact text (edits snapshot new versions). Accept-with-edit and reject-with-reason each distill a global preference rule via LLM (see §10). Publish gate reads these verdicts.
+- Later editor integration: panel with edit/approve/regenerate/reject actions over the same verdicts
 
 ### 7.6 Publish — copy-only, identical on every platform (decided)
 - `postdiff publish [--blog|--x|--linkedin] [sha]` (default HEAD) copies the accepted draft to the clipboard; the user pastes wherever they like. No intent URLs, no compose tabs, no OAuth in v1.
@@ -108,16 +107,17 @@ Design principles (not tech choices):
 - Secrets are passed into the engine as inputs, never read directly by it, and never stored in plain settings files
 - Test coverage lives where the logic lives (significance, context, generation, voice/feedback)
 
-## 9. Tech Stack
+## 9. Tech Stack (decided)
 
-TBD — to be decided during build. Constraints only:
-
+- TypeScript + Node monorepo: engine in `packages/core/` (`@postdiff/core` — UI-agnostic, no commander/clack/clipboardy, secrets passed in never read), terminal surface in `apps/terminal/` (`postdiff` — 8 CLI commands + `tui/` stub for the bare-`postdiff` fullscreen slot). Shared `tsconfig.base.json`; build is `tsc -b packages/core apps/terminal`. `apps/*` + `packages/*` workspaces.
 - Local-first, single-user
 - Native git for history/diffs — no hosted-git API or webhook dependency
 - Browser-free publishing — no paid platform API tiers, no OAuth, no tabs in v1
+- `commander` for CLI routing, `@clack/prompts` for interactive UI (one intro/outro per command, `isInteractive()` TTY gate), `clipboardy` for publish, Vercel AI SDK for generation, `@typesafe-ai/sdk` (pinned) for Jev
 
-## 10. Command Surface (decided draft — refinements open)
+## 10. Command Surface (decided — refinements open)
 
+- `postdiff setup` — interactive wizard (name, Jev key, provider + model + key with live validation, optional voice/reference seed); re-runnable for updates, pre-fills current values
 - `postdiff context [<sha>] [--json]` — generation-ready context inspector for a commit (replaces retired `postdiff diff`; no LLM, no `--staged` pre-commit preview in v1)
 - `postdiff generate [<sha>] [--force] [--blog|--x|--linkedin]` — Jev gate then drafts **one** requested platform; default `<sha>` = HEAD; `--force` skips the Jev gate
 - `postdiff voice [add|create|remove|view] [--blog|--x|--linkedin] ["<pasted string>"]` — `add` appends, `create` overwrites, `remove` clears, `view` shows all (flag filters to one); `voice.md` always pairs with the platform file
@@ -151,12 +151,12 @@ TBD — to be decided during build. Constraints only:
 - Number of generation triggers per active user per week (proxy for habit formation)
 - Retention after first week (does the tool survive the cold-start mediocrity period)
 
-## 14. Build Phases (capability order — scaffolding choices TBD)
+## 14. Build Phases (capability order — monorepo scaffolding done)
 
 1. Diff/commit extraction
 2. Significance filter (Jev Noul judge + `--force` bypass)
 3. Voice profile loader (per-platform `.md` files: `blog.md`, `x.md`, `linkedin.md`)
-4. Generation — prompt builder + provider call via Vercel AI SDK (provider registry), one platform per request (Blog, X, LinkedIn; YouTube deferred)
+4. Generation — prompt assembly + provider call via Vercel AI SDK (provider registry + pipeline, one platform per request; Blog, X, LinkedIn; YouTube deferred)
 5. Review output (display + file persistence to global `~/.postdiff`)
 6. Publish — copy-only (`clipboardy`; gate: accepted + hash-matched, per §7.6)
 7. Feedback loop — V2 (deferred): persist edit/accept/reject signal, feed back into voice profile. V1 ships static voice only.
@@ -176,4 +176,4 @@ TBD — to be decided during build. Constraints only:
 - Real, verified statistics for the business/impact case are not yet sourced — competitor-published engagement stats must not be used as Postdiff's own supporting facts
 - Pricing model numbers not yet modeled against actual API costs
 - Team name/branding beyond the product name "Postdiff" not yet finalized
-- ~~Implementation stack~~ → Resolved: TypeScript + Node, Vercel AI SDK over the provider registry (groq default; provider + model in config), `@typesafe-ai/sdk` for Jev, `commander` for CLI, `clipboardy` for publish
+- ~~Implementation stack~~ → Resolved: TypeScript + Node monorepo (`packages/core` engine + `apps/terminal` CLI/TUI), Vercel AI SDK over the provider registry (groq default; provider + model in config), `@typesafe-ai/sdk` for Jev, `commander` for CLI, `clipboardy` for publish
