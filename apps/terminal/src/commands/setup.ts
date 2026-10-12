@@ -4,9 +4,9 @@
 // leaves the previous install untouched.
 
 import * as p from "@clack/prompts";
-import { applySetup, pingProviderKey, pingTypesafeKey, loadConfig, PROVIDERS, getProviderSpec, type Platform, type ProviderSpec } from "@postdiff/core";
+import { applySetup, pingProviderKey, pingTypesafeKey, loadConfig, PROVIDERS, getProviderSpec, parseSkillName, type Platform, type ProviderSpec } from "@postdiff/core";
 import { resolveKeys } from "../keys.js";
-import { showBigText } from "../big-text.js";
+import { startBigTextLoop } from "../big-text.js";
 import type { CommandContext, PostdiffCommand } from "../router.js";
 
 const TYPESAFE_KEYS_URL = "https://console.typesafe.ai/keys";
@@ -125,6 +125,33 @@ async function promptReference(): Promise<{ platform: Platform; content: string 
 }
 
 /**
+ * Optional plugin skill: paste the whole skill file first, then confirm the
+ * file name — pre-filled from the pasted file's `name:` frontmatter.
+ */
+async function promptPlugin(): Promise<{ platform: Platform; name: string; content: string } | null> {
+  const content = await promptOptionalMarkdown("Plugin skill", "plugin skill");
+  if (!content) return null;
+  const parsed = parseSkillName(content);
+  const name = await p.text({
+    message: "Plugin skill name (file: plugins/<platform>/<name>.md)",
+    initialValue: parsed ?? "",
+    placeholder: parsed ?? "my-skill",
+    validate: (v) => (!v || !v.trim() ? "Name is required for the plugin skill." : undefined),
+  });
+  if (p.isCancel(name)) cancelled();
+  const platform = await p.select({
+    message: "Which platform is this plugin skill for?",
+    options: [
+      { value: "x" as Platform, label: "X" },
+      { value: "linkedin" as Platform, label: "LinkedIn" },
+      { value: "blog" as Platform, label: "Blog" },
+    ],
+  });
+  if (p.isCancel(platform)) cancelled();
+  return { platform, name: (name as string).trim(), content };
+}
+
+/**
  * Runs the full interactive wizard. Resolves true when setup was completed
  * and saved, false when the user cancelled or declined (no writes happened).
  * Throws only on unexpected internal errors.
@@ -139,58 +166,68 @@ export async function runSetupWizard(): Promise<boolean> {
 }
 
 async function wizard(): Promise<boolean> {
-  const { typesafeKey: currentTypesafe, providerKeys } = resolveKeys();
-  const config = await loadConfig();
-  const currentUser = config.user.name;
+  // Looping block-letter banner (raw stdout, uppercase "POSTDIFF"). Returns
+  // immediately — the Clack session opens below while the glint keeps
+  // sweeping above. Stopped in `finally` so cancel/decline restores cleanly.
+  const stopBanner = startBigTextLoop("postdiff");
+  try {
+    const { typesafeKey: currentTypesafe, providerKeys } = resolveKeys();
+    const config = await loadConfig();
+    const currentUser = config.user.name;
 
-  // Block-letter banner first (raw stdout); the Clack session opens after it.
-  await showBigText("postdiff");
-  p.intro("postdiff setup");
-  p.note(
-    "name      → ~/.postdiff/config.json\nAPI keys  → ~/.postdiff/.env (never in config.json)\nvoice/reference → ~/.postdiff/{voice,reference}/",
-    "Everything stays local",
-  );
+    p.intro("postdiff setup");
+    p.note(
+      "name      → ~/.postdiff/config.json\nAPI keys  → ~/.postdiff/.env (never in config.json)\nvoice/reference → ~/.postdiff/{voice,reference}/\nplugins   → ~/.postdiff/plugins/<platform>/<skill>.md",
+      "Everything stays local",
+    );
 
-  const name = await p.text({
-    message: "Your name (required — used to sign drafts)",
-    initialValue: currentUser,
-    validate: (v) => (!v || !v.trim() ? "Name is required — it cannot be skipped." : undefined),
-  });
-  if (p.isCancel(name)) cancelled();
+    const name = await p.text({
+      message: "Your name (required — used to sign drafts)",
+      initialValue: currentUser,
+      validate: (v) => (!v || !v.trim() ? "Name is required — it cannot be skipped." : undefined),
+    });
+    if (p.isCancel(name)) cancelled();
 
-  const typesafeKey = await promptRequiredKey("TYPESAFE_API_KEY (Jev)", TYPESAFE_KEYS_URL, pingTypesafeKey, currentTypesafe);
+    const typesafeKey = await promptRequiredKey("TYPESAFE_API_KEY (Jev)", TYPESAFE_KEYS_URL, pingTypesafeKey, currentTypesafe);
 
-  const providerSpec = await promptProvider(config.models.provider);
-  const genModel = await promptModel(providerSpec, config.models.genModel);
-  const currentProviderKey = providerKeys[providerSpec.envKey] ?? "";
-  const providerKey = await promptRequiredKey(
-    providerSpec.envKey,
-    providerSpec.keysUrl,
-    (key) => pingProviderKey(providerSpec.id, key, genModel),
-    currentProviderKey,
-  );
+    const providerSpec = await promptProvider(config.models.provider);
+    const genModel = await promptModel(providerSpec, config.models.genModel);
+    const currentProviderKey = providerKeys[providerSpec.envKey] ?? "";
+    const providerKey = await promptRequiredKey(
+      providerSpec.envKey,
+      providerSpec.keysUrl,
+      (key) => pingProviderKey(providerSpec.id, key, genModel),
+      currentProviderKey,
+    );
 
-  const voiceMd = await promptOptionalMarkdown("Voice profile (voice.md)", "voice");
-  const reference = await promptReference();
+    const voiceMd = await promptOptionalMarkdown("Voice profile (voice.md)", "voice");
+    const reference = await promptReference();
+    const plugin = await promptPlugin();
 
-  const proceed = await p.confirm({
-    message: `Save this setup${voiceMd || reference ? " (incl. voice/reference)" : ""}?`,
-    initialValue: true,
-  });
-  if (p.isCancel(proceed) || !proceed) cancelled();
+    const proceed = await p.confirm({
+      message: `Save this setup${voiceMd || reference || plugin ? " (incl. voice/reference/plugin)" : ""}?`,
+      initialValue: true,
+    });
+    if (p.isCancel(proceed) || !proceed) cancelled();
 
-  const result = await applySetup({
-    name,
-    typesafeKey,
-    provider: providerSpec.id,
-    genModel,
-    providerKey,
-    voiceMd,
-    referencePlatform: reference?.platform,
-    referenceMd: reference?.content,
-  });
-  p.outro(`Setup saved — ${providerSpec.label} · ${genModel}\nconfig: ${result.configPath}\nKeys: ${result.envPath}\nTry it: postdiff generate --x`);
-  return true;
+    const result = await applySetup({
+      name,
+      typesafeKey,
+      provider: providerSpec.id,
+      genModel,
+      providerKey,
+      voiceMd,
+      referencePlatform: reference?.platform,
+      referenceMd: reference?.content,
+      pluginPlatform: plugin?.platform,
+      pluginName: plugin?.name,
+      pluginMd: plugin?.content,
+    });
+    p.outro(`Setup saved — ${providerSpec.label} · ${genModel}\nconfig: ${result.configPath}\nKeys: ${result.envPath}\nTry it: postdiff generate --x`);
+    return true;
+  } finally {
+    stopBanner();
+  }
 }
 
 async function run(_ctx: CommandContext): Promise<void> {
@@ -199,6 +236,6 @@ async function run(_ctx: CommandContext): Promise<void> {
 
 export const command: PostdiffCommand = {
   name: "setup",
-  description: "first-run or update setup: name, provider/model/key, optional voice/reference",
+  description: "first-run or update setup: name, provider/model/key, optional voice/reference/plugin",
   run,
 };

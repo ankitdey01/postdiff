@@ -136,3 +136,115 @@ export async function showBigText(text = "postdiff"): Promise<void> {
     process.stdout.write("\x1b[?25h");
   }
 }
+
+/**
+ * Loop the banner glint in the background while the wizard runs.
+ *
+ * Prints the resting frame once and returns immediately so the caller can
+ * open its Clack session straight away — prompts render below while the
+ * glint keeps sweeping above. Each tick rewrites only the banner block:
+ * the cursor is saved, moved up over whatever the wizard has printed since
+ * (`below` tracks net newlines via a `stdout.write` wrapper, ignoring our
+ * own animation writes), the banner lines are redrawn with per-line erase,
+ * and the cursor is restored to the prompt input. No full-screen clear, so
+ * nothing scrolls or flashes. Ticks that land mid-draw (a write happened in
+ * the last ~80ms) or after the banner has scrolled off-screen are skipped
+ * to avoid tearing the Clack gutter.
+ *
+ * The returned `stop` redraws the resting frame once, unwraps
+ * `stdout.write`, and must be called exactly once (wizard `finally`).
+ * Non-TTY prints one static frame and returns a no-op.
+ */
+export function startBigTextLoop(text = "postdiff"): () => void {
+  const frame = createBigTextFrame({ text });
+  const at = (t: number): string => {
+    const width = process.stdout.columns ?? BIG_TEXT_COLS;
+    return frame(t)
+      .split("\n")
+      .map((l) => l.slice(0, width))
+      .join("\n");
+  };
+  const resting = at(0);
+  const rows = resting.split("\n").length;
+  if (!process.stdout.isTTY || process.env["TERM"] === "dumb") {
+    process.stdout.write(resting + "\n");
+    return () => {};
+  }
+
+  const out = process.stdout;
+  const origWrite = out.write;
+  let below = 0;
+  let lastWrite = 0;
+  let animating = false;
+
+  const patched = (chunk: unknown, encodingOrCb?: unknown, cb?: unknown): boolean => {
+    if (!animating) {
+      try {
+        const s =
+          typeof chunk === "string" ? chunk : Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk ?? "");
+        lastWrite = Date.now();
+        let ups = 0;
+        let downs = 0;
+        let nls = 0;
+        for (const m of s.matchAll(/\x1b\[(\d*)[AF]/g)) ups += m[1] ? Number.parseInt(m[1], 10) : 1;
+        for (const m of s.matchAll(/\x1b\[(\d*)[BE]/g)) downs += m[1] ? Number.parseInt(m[1], 10) : 1;
+        for (let i = 0; i < s.length; i++) if (s[i] === "\n") nls++;
+        below += nls - ups + downs;
+        if (below < 0) below = 0;
+      } catch {
+        // Counting is best-effort — never break the wrapped write.
+      }
+    }
+    return (origWrite as (...a: unknown[]) => boolean).call(out, chunk as never, encodingOrCb as never, cb as never);
+  };
+  (out as { write: unknown }).write = patched;
+
+  (origWrite as (...a: unknown[]) => boolean).call(out, resting + "\n");
+
+  const FPS = 12;
+  let t = 0;
+  const draw = (frameText: string): void => {
+    const lines = frameText.split("\n");
+    animating = true;
+    try {
+      const n = below + rows;
+      (origWrite as (...a: unknown[]) => boolean).call(out, `\x1b[s\x1b[${n}A\x1b[1G`);
+      for (let i = 0; i < lines.length; i++) {
+        (origWrite as (...a: unknown[]) => boolean).call(out, `\x1b[K${lines[i]}`);
+        if (i < lines.length - 1) (origWrite as (...a: unknown[]) => boolean).call(out, "\n");
+      }
+      (origWrite as (...a: unknown[]) => boolean).call(out, "\x1b[u");
+    } finally {
+      animating = false;
+    }
+  };
+
+  const timer = setInterval(() => {
+    try {
+      // Skip mid-draw ticks so a banner redraw never splits a Clack write burst.
+      if (Date.now() - lastWrite < 80) return;
+      // Banner scrolled off — leave the scrolled content alone.
+      if (below + rows >= (out.rows ?? 24)) return;
+      t += 1 / FPS;
+      draw(at(t));
+    } catch {
+      // Animation must never crash the wizard.
+    }
+  }, 1000 / FPS);
+  // The wizard awaits prompts for minutes — the interval must not hold the loop open.
+  (timer as unknown as { unref?: () => void }).unref?.();
+
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(timer);
+    try {
+      if (below + rows < (out.rows ?? 24)) draw(resting);
+    } catch {
+      // Best-effort final frame.
+    } finally {
+      (out as { write: unknown }).write = origWrite;
+    }
+  };
+}

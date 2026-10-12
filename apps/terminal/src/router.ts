@@ -6,6 +6,7 @@
 import { Command } from "commander";
 import { command as contextCommand } from "./commands/context.js";
 import { command as generateCommand } from "./commands/generate.js";
+import { command as pluginCommand } from "./commands/plugin.js";
 import { command as preferencesCommand } from "./commands/preferences.js";
 import { command as publishCommand } from "./commands/publish.js";
 import { command as referenceCommand } from "./commands/reference.js";
@@ -57,7 +58,7 @@ function register(program: Command, cwd: string, cmd: PostdiffCommand): void {
   });
 }
 
-const ALL_COMMANDS = [contextCommand, generateCommand, preferencesCommand, publishCommand, referenceCommand, reviewCommand, setupCommand, voiceCommand];
+const ALL_COMMANDS = [contextCommand, generateCommand, pluginCommand, preferencesCommand, publishCommand, referenceCommand, reviewCommand, setupCommand, voiceCommand];
 
 /** Builds the program and parses argv. Commands set process.exitCode themselves. */
 export async function runProgram(argv: string[], cwd: string, version: string): Promise<void> {

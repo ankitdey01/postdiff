@@ -36,6 +36,8 @@ export interface GenerateInput {
   reference: string;
   /** Platform taste rules learned across commits (~/.postdiff/preferences/). */
   globalPreferences: string[];
+  /** Custom plugin skills for this platform (~/.postdiff/plugins/). Empty = none. */
+  plugin?: string;
   /** Repo README at the commit, if present. Null = absent, section omitted. */
   readme?: string | null;
 }
@@ -168,7 +170,7 @@ export class SdkGenerator implements Generator {
       input.voicePlatform,
       input.reference,
       input.globalPreferences,
-      { webSearch: webAttached, readme: input.readme ?? null, summary: input.summary },
+      { webSearch: webAttached, readme: input.readme ?? null, summary: input.summary, plugin: input.plugin ?? "" },
     );
     // TextStream yields deltas live and the promise-likes below resolve once
     // the stream is fully consumed.

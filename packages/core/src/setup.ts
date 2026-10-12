@@ -9,6 +9,7 @@ import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { generateText } from "ai";
 import { overwriteVoiceSample } from "./profile/voice.js";
 import { overwriteReferenceExample, platformReferenceFile } from "./profile/reference.js";
+import { sanitizeSkillName, writePluginSkill } from "./profile/plugin.js";
 import { ensurePostdiffHome, getConfigPath, getEnvPath, loadConfig, DEFAULT_CONFIG, CONFIG_VERSION } from "./store.js";
 import { getProviderSpec } from "./generation/providers.js";
 import { withTimeout } from "./async.js";
@@ -30,6 +31,12 @@ export interface SetupAnswers {
   referencePlatform?: Platform;
   /** Optional reference example content (empty/undefined = leave untouched). */
   referenceMd?: string;
+  /** Optional plugin skill: which platform folder it lands in. */
+  pluginPlatform?: Platform;
+  /** Optional plugin skill file name (parsed from frontmatter when omitted). */
+  pluginName?: string;
+  /** Optional plugin skill content (empty/undefined = leave untouched). */
+  pluginMd?: string;
 }
 
 export interface SetupResult {
@@ -151,19 +158,32 @@ export async function applySetup(answers: SetupAnswers): Promise<SetupResult> {
   // later write fails while updating an existing setup.
   const voice = (answers.voiceMd ?? "").trim();
   const reference = (answers.referenceMd ?? "").trim();
+  const plugin = (answers.pluginMd ?? "").trim();
   const voicePath = `${home}/voice/voice.md`;
   const referencePath = reference && answers.referencePlatform ? `${home}/reference/${platformReferenceFile(answers.referencePlatform)}` : null;
+  const pluginSafeName = plugin && answers.pluginPlatform ? sanitizeSkillName(answers.pluginName ?? "") : "";
+  const pluginPath =
+    plugin && answers.pluginPlatform && pluginSafeName ? `${home}/plugins/${answers.pluginPlatform}/${pluginSafeName}.md` : null;
   const voiceBackup = voice ? await readFile(voicePath, "utf8").catch(() => "") : null;
   const referenceBackup = referencePath ? await readFile(referencePath, "utf8").catch(() => "") : null;
+  const pluginBackup = pluginPath ? await readFile(pluginPath, "utf8").catch(() => null) : null;
   try {
     if (voice) await overwriteVoiceSample(`${home}/voice`, "voice.md", voice);
     if (reference && answers.referencePlatform) {
       await overwriteReferenceExample(`${home}/reference`, platformReferenceFile(answers.referencePlatform), reference);
     }
+    if (plugin && answers.pluginPlatform) {
+      if (!pluginSafeName) throw new Error("Invalid plugin name — use letters, numbers, dashes.");
+      await writePluginSkill(`${home}/plugins`, answers.pluginPlatform, pluginSafeName, plugin);
+    }
     await rename(tmp, configPath);
   } catch (err) {
     if (voiceBackup !== null) await writeFile(voicePath, voiceBackup, "utf8").catch(() => {});
     if (referenceBackup !== null && referencePath) await writeFile(referencePath, referenceBackup, "utf8").catch(() => {});
+    if (pluginPath) {
+      if (pluginBackup !== null) await writeFile(pluginPath, pluginBackup, "utf8").catch(() => {});
+      else await unlink(pluginPath).catch(() => {});
+    }
     await unlink(tmp).catch(() => {});
     throw err;
   }

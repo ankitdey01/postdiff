@@ -3,7 +3,7 @@
 
 import type { CommitContext } from "../source/context.js";
 import type { Platform } from "../shared/types.js";
-import { REFERENCE_INSTRUCTION, SEARCH_INSTRUCTION } from "../prompts.js";
+import { PLUGIN_INSTRUCTION, REFERENCE_INSTRUCTION, SEARCH_INSTRUCTION } from "../prompts.js";
 import { platformSpec } from "./platforms.js";
 
 export interface AssembledPrompt {
@@ -27,7 +27,7 @@ export function assemblePrompt(
   voicePlatform: string,
   reference: string,
   globalPreferences: string[],
-  opts: { webSearch?: boolean; readme?: string | null; summary: string },
+  opts: { webSearch?: boolean; readme?: string | null; summary: string; plugin?: string },
 ): AssembledPrompt {
   const spec = platformSpec(platform);
   const system = [
@@ -61,6 +61,9 @@ export function assemblePrompt(
     "",
     REFERENCE_INSTRUCTION,
     reference.trim() || "(no reference examples yet)",
+    "",
+    PLUGIN_INSTRUCTION,
+    opts?.plugin?.trim() || "(no plugin skills yet)",
     // Only mention browser_search when the tool is actually attached (--web
     // + supported provider/model). Otherwise the model would be instructed
     // to call a tool that doesn't exist.

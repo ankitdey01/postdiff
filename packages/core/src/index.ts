@@ -59,6 +59,19 @@ export {
   overwriteReferenceExample,
   clearReferenceFile,
 } from "./profile/reference.js";
+export { PLUGIN_PLATFORMS } from "./profile/plugin.js";
+export type { PluginPlatform } from "./profile/plugin.js";
+export {
+  platformPluginDir,
+  parseSkillName,
+  sanitizeSkillName,
+  ensurePluginFiles,
+  listPluginSkills,
+  readPluginSkill,
+  writePluginSkill,
+  deletePluginSkill,
+  readPluginSkills,
+} from "./profile/plugin.js";
 export { gatherCommitContext, loadOrGatherCommitContext, saveCommitContext, loadCommitContext } from "./source/context.js";
 export { cleanText, MAX_FILE_CHARS, MAX_TOTAL_CHARS, CONTEXT_SCHEMA } from "./source/context.js";
 export type { CommitContext, ContextFile, OmitReason } from "./source/context.js";

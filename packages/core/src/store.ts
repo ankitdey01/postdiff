@@ -8,6 +8,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import type { Verdict } from "./shared/types.js";
 import { ensureVoiceFiles } from "./profile/voice.js";
 import { ensureReferenceFiles } from "./profile/reference.js";
+import { ensurePluginFiles } from "./profile/plugin.js";
 import { ensurePreferenceFiles } from "./profile/preferences.js";
 
 export interface PostdiffUser {
@@ -82,11 +83,12 @@ export async function getRepoSlug(cwd: string): Promise<string> {
   return `${name}-${sha1Hex(key, 8)}`;
 }
 
-/** Full first-run skeleton: voice + reference + preference files, config, repos dir. */
+/** Full first-run skeleton: voice + reference + plugin + preference files, config, repos dir. */
 export async function ensurePostdiffHome(): Promise<string> {
   const home = getPostdiffHome();
   await ensureVoiceFiles(join(home, "voice"));
   await ensureReferenceFiles(join(home, "reference"));
+  await ensurePluginFiles(join(home, "plugins"));
   await ensurePreferenceFiles(join(home, "preferences"));
   await mkdir(join(home, "repos"), { recursive: true });
   const configPath = join(home, "config.json");

@@ -17,6 +17,7 @@ import {
 import { JevInclusionJudge, filterShapedDiff } from "../significance/inclusion.js";
 import { readVoiceFile } from "../profile/voice.js";
 import { readReferenceFile, platformReferenceFile } from "../profile/reference.js";
+import { readPluginSkills } from "../profile/plugin.js";
 import { readPreferenceFile, splitPreferenceRules, platformPreferenceFile } from "../profile/preferences.js";
 import { readReviewState, initReview } from "../delivery/review.js";
 import { SdkGenerator, platformDraftFile } from "./generator.js";
@@ -53,6 +54,7 @@ export interface PipelineEvent {
     | "filter-ran"
     | "filter-skipped"
     | "preferences-loaded"
+    | "plugins-loaded"
     | "gen-model-warning"
     | "summary-building"
     | "summary-cached"
@@ -163,17 +165,21 @@ export async function generatePipeline(
       message: `warning: --web requested but web search is unavailable for ${providerId}/${config.models.genModel} — drafting without it.`,
     });
   }
-  const [voiceDefault, voicePlatform, prevReview, globalRulesRaw, reference, readme] = await Promise.all([
+  const [voiceDefault, voicePlatform, prevReview, globalRulesRaw, reference, plugin, readme] = await Promise.all([
     readVoiceFile(join(home, "voice"), "voice.md"),
     readVoiceFile(join(home, "voice"), platformDraftFile(platform)),
     readReviewState(dir, platform),
     readPreferenceFile(join(home, "preferences"), platformPreferenceFile(platform)),
     readReferenceFile(join(home, "reference"), platformReferenceFile(platform)),
+    readPluginSkills(join(home, "plugins"), platform),
     loadReadmeAtCommit(input.cwd, context.sha),
   ]);
   const globalPreferences = splitPreferenceRules(globalRulesRaw);
   if (globalPreferences.length > 0) {
     emit({ kind: "preferences-loaded", message: `applying ${globalPreferences.length} platform taste rule(s).` });
+  }
+  if (plugin.trim()) {
+    emit({ kind: "plugins-loaded", message: `applying custom plugin skill(s) for ${platform}.` });
   }
 
   // 6. Stage 2 inclusion filter
@@ -268,7 +274,7 @@ export async function generatePipeline(
   // 8. Generate draft from the brief (summary-only — no raw diff in prompt).
   emit({ kind: "drafting", message: `drafting ${platform} (streaming${webActive ? ", web search on" : ""}) —` });
   const draft = await generator.generateStream(
-    { platform, context, summary: brief, voiceDefault, voicePlatform, reference, globalPreferences, readme },
+    { platform, context, summary: brief, voiceDefault, voicePlatform, reference, globalPreferences, plugin, readme },
     onChunk,
   );
   if (draft.webSearch === "fallback") {

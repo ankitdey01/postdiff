@@ -73,6 +73,15 @@ export const REFERENCE_INSTRUCTION = [
   "for THIS commit. Match the style, never copy their phrases, facts, or topics.",
 ].join("\n");
 
+/** How the writer must treat plugin skills. */
+export const PLUGIN_INSTRUCTION = [
+  "Plugin skills below are the author's custom skills for this platform.",
+  "Treat each skill as an authoritative instruction for THIS draft: follow its",
+  "rules, structure, and constraints while writing. On any conflict with voice",
+  "samples or reference examples above, plugin skills win — but hard constraints",
+  "from the author (listed earlier) still win over everything.",
+].join("\n");
+
 /* ---------------- change-brief summarizer ---------------- */
 
 /** System prompt for the once-per-sha brief builder: facts only, no voice. */
