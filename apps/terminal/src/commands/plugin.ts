@@ -50,13 +50,21 @@ async function ensurePlatform(ctx: CommandContext): Promise<PluginPlatform | nul
 
 /**
  * Skill content for `create`: `postdiff plugin create --blog <name> "<skill>"`,
- * a lone `"<skill>"` arg (name parsed from its frontmatter later), or an
- * interactive multiline paste. Null = missing and non-interactive.
+ * a lone `"<skill>"` arg (name parsed from its frontmatter later), piped
+ * stdin (`cat skill.md | postdiff plugin create --blog`), or an interactive
+ * multiline paste. Null = missing and non-interactive.
  */
 async function ensureSkillBody(args: string[]): Promise<string | null | undefined> {
   // create with explicit name: [name, ...skill]
   const body = args.length >= 2 ? args.slice(1).join(" ") : args.length === 1 ? args[0] : "";
   if (body.trim()) return body;
+  // Piped stdin reports isTTY as undefined, not false — hence the falsy
+  // check. Guarded on stdin (not isInteractive): a TTY stdin with redirected
+  // stdout must not block here waiting for typed input.
+  if (!process.stdin.isTTY) {
+    const piped = await readPipedStdin();
+    return piped.trim();
+  }
   if (!isInteractive()) return null;
   const pasted = await promptLongText(
     "Paste the skill file (.md with frontmatter)",
@@ -64,6 +72,32 @@ async function ensureSkillBody(args: string[]): Promise<string | null | undefine
   );
   if (p.isCancel(pasted)) return undefined;
   return pasted.trim();
+}
+
+/** Drains piped stdin to EOF. Only called when stdin is not a TTY, so EOF arrives on its own. */
+async function readPipedStdin(): Promise<string> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    const cleanup = () => {
+      process.stdin.removeListener("data", onData);
+      process.stdin.removeListener("end", onEnd);
+      process.stdin.removeListener("error", onError);
+    };
+    const onData = (chunk: Buffer) => {
+      chunks.push(chunk);
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    };
+    const onError = () => {
+      cleanup();
+      resolve("");
+    };
+    process.stdin.on("data", onData);
+    process.stdin.on("end", onEnd);
+    process.stdin.on("error", onError);
+  });
 }
 
 /**
@@ -264,7 +298,7 @@ async function run(ctx: CommandContext): Promise<void> {
     return;
   }
   if (skill === null) {
-    p.log.error(`Nothing to save — pass "<skill.md>" or run interactively. e.g. postdiff plugin create --${platform} my-skill "<skill.md>"`);
+    p.log.error(`Nothing to save — pass "<skill.md>", pipe it (cat skill.md | postdiff plugin create --${platform}), or run interactively. e.g. postdiff plugin create --${platform} my-skill "<skill.md>"`);
     process.exitCode = 1;
     uiOutro("nothing changed.");
     return;
