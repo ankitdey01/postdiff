@@ -18,7 +18,7 @@ import {
 import type { CommandContext, PostdiffCommand } from "../router.js";
 import type { VoiceFile } from "@postdiff/core";
 import { singleFlag } from "../helpers.js";
-import { uiIntro, uiOutro, isInteractive, showNote } from "../ui.js";
+import { uiIntro, uiOutro, isInteractive, showNote, promptLongText } from "../ui.js";
 
 function voiceDir(): string {
   return join(getPostdiffHome(), "voice");
@@ -54,12 +54,7 @@ async function ensureSample(ctx: CommandContext): Promise<string | null | undefi
   const sample = ctx.positional.slice(1).join(" ");
   if (sample.trim()) return sample;
   if (!isInteractive()) return null;
-  // No `showSubmit`: that flag disables double-Enter-to-submit and traps the
-  // user in newline-insertion. Double-Enter submits, empty skips.
-  const pasted = await p.multiline({
-    message: "Paste the sample — Enter twice to submit, empty skips",
-    placeholder: "Your voice sample markdown…",
-  });
+  const pasted = await promptLongText("Paste the sample", "Your voice sample markdown…");
   if (p.isCancel(pasted)) return undefined;
   return pasted.trim();
 }

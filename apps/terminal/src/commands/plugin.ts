@@ -3,9 +3,7 @@
 // skill, e.g. plugins/blog/blog-seo-check.md). Generation concatenates every
 // file in the platform folder. Subcommands: create | delete | view.
 // Clack UI: skills in bordered notes, outcomes as log lines, `select` /
-// `text` fallbacks when flags or args are missing on a TTY. Skill content
-// arrives via args, piped stdin, or a paste-read below (never a multiline
-// prompt — see ensureSkillBody and readPastSkill).
+// `text` / `multiline` fallbacks when flags or args are missing on a TTY.
 
 import { join } from "node:path";
 import * as p from "@clack/prompts";
@@ -23,7 +21,7 @@ import {
 import type { CommandContext, PostdiffCommand } from "../router.js";
 import type { PluginPlatform } from "@postdiff/core";
 import { singleFlag } from "../helpers.js";
-import { uiIntro, uiOutro, isInteractive, showNote } from "../ui.js";
+import { uiIntro, uiOutro, isInteractive, showNote, promptLongText } from "../ui.js";
 
 function pluginHome(): string {
   return join(getPostdiffHome(), "plugins");
@@ -52,144 +50,20 @@ async function ensurePlatform(ctx: CommandContext): Promise<PluginPlatform | nul
 
 /**
  * Skill content for `create`: `postdiff plugin create --blog <name> "<skill>"`,
- * a lone `"<skill>"` arg (name parsed from its frontmatter later), piped
- * stdin (`cat skill.md | postdiff plugin create --blog`), or an interactive
- * paste read. Null = missing and non-interactive.
+ * a lone `"<skill>"` arg (name parsed from its frontmatter later), or an
+ * interactive multiline paste. Null = missing and non-interactive.
  */
 async function ensureSkillBody(args: string[]): Promise<string | null | undefined> {
   // create with explicit name: [name, ...skill]
   const body = args.length >= 2 ? args.slice(1).join(" ") : args.length === 1 ? args[0] : "";
   if (body.trim()) return body;
-  // Note: piped stdin reports isTTY as undefined, not false — hence the falsy check.
-  if (!process.stdin.isTTY) {
-    p.log.message("Reading skill from stdin… (Ctrl+C cancels)");
-    const piped = await readStdinToEof();
-    if (piped === undefined) return undefined;
-    return piped.trim();
-  }
-  if (!isInteractive()) return null;  p.log.message("Paste the skill file — what you type appears below. Enter is just a newline. Finish with Ctrl+Z (Windows) or Ctrl+D (macOS/Linux), or a line containing only EOF; Ctrl+C cancels.");
-  const pasted = await readPastSkill();
-  if (pasted === undefined) return undefined;
+  if (!isInteractive()) return null;
+  const pasted = await promptLongText(
+    "Paste the skill file (.md with frontmatter)",
+    "---\nname: my-skill\ndescription: >\n  What this skill does…\n---\n\n# Skill instructions…",
+  );
+  if (p.isCancel(pasted)) return undefined;
   return pasted.trim();
-}
-
-/** Drains piped stdin to EOF. Never called for a TTY, so it never blocks on typed input. */
-async function readStdinToEof(): Promise<string | undefined> {
-  return new Promise((resolve) => {
-    const chunks: Buffer[] = [];
-    const cleanup = () => {
-      process.stdin.removeListener("data", onData);
-      process.stdin.removeListener("end", onEnd);
-      process.stdin.removeListener("error", onError);
-      process.removeListener("SIGINT", onSigint);
-    };
-    const onData = (chunk: Buffer) => {
-      chunks.push(chunk);
-    };
-    const onEnd = () => {
-      cleanup();
-      resolve(Buffer.concat(chunks).toString("utf8"));
-    };
-    const onError = () => {
-      cleanup();
-      resolve(undefined);
-    };
-    const onSigint = () => {
-      cleanup();
-      resolve(undefined);
-    };
-    // A SIGINT listener suppresses Node's default exit-on-Ctrl+C while this
-    // read owns stdin; cleanup restores the default for later prompts.
-    process.on("SIGINT", onSigint);
-    process.stdin.on("data", onData);
-    process.stdin.on("end", onEnd);
-    process.stdin.on("error", onError);
-  });
-}
-
-/**
- * Interactive paste-read: a minimal raw-mode line editor. Reason it exists:
- * clack's multiline prompt truncates pastes (double-Enter submit fires on the
- * blank line after frontmatter `---`), its showSubmit Tab-to-submit proved
- * undiscoverable and makes plain Enter never submit, and Node cooked mode on
- * Windows cannot distinguish Ctrl+C-cancel from stream-end (conhost ends the
- * console read either way), so a readline-based read submits partial pastes
- * on cancel. Here stdin is raw and this module owns every byte: Enter is
- * just a newline (echoed live), blank lines survive verbatim, Ctrl+Z
- * (Windows; \x1a byte) or Ctrl+D (POSIX; \x04 byte) submits, Ctrl+C (\x03)
- * cancels, and a line containing only `EOF` submits everywhere as the
- * manual fallback.
- */
-async function readPastSkill(): Promise<string | undefined> {
-  const stdin = process.stdin;
-  return new Promise((resolve) => {
-    let raw = false;
-    let done = false;
-    const lines: string[] = [];
-    let cur = "";
-    try {
-      stdin.setRawMode(true);
-      raw = true;
-    } catch {
-      // Non-TTY fallthrough should not happen (caller checks isTTY).
-    }
-    const finish = (result: string | undefined) => {
-      if (done) return;
-      done = true;
-      stdin.removeListener("data", onData);
-      process.removeListener("SIGINT", onSigint);
-      if (raw) {
-        try { stdin.setRawMode(false); } catch {}
-      }
-      stdin.pause();
-      process.stdout.write("\n");
-      resolve(result);
-    };
-    // Enter → newline (a line containing only `EOF` submits instead); Ctrl+Z
-    // or Ctrl+D → submit; Ctrl+C → cancel; everything else (pasted blobs
-    // included) accumulates and echoes live.
-    const finishEditing = () => {
-      if (cur.trimEnd() === "EOF") {
-        cur = "";
-        return finish(lines.join("\n"));
-      }
-      lines.push(cur);
-      cur = "";
-      process.stdout.write("\n");
-    };
-    const onData = (chunk: Buffer) => {
-      let lastWasCr = false;
-      for (const ch of chunk.toString("utf8")) {
-        // ConPTY doubles line endings on paste (`\r\n` can arrive as
-        // `\r\r\n`) — a `\n` straight after a `\r` is the same Enter.
-        if (ch === "\r") {
-          lastWasCr = true;
-          finishEditing();
-        } else if (ch === "\n") {
-          const wasDouble = lastWasCr;
-          lastWasCr = false;
-          if (wasDouble) continue;
-          finishEditing();
-        } else if (ch === "\x1a" || ch === "\x04") {
-          return finish(lines.join("\n"));
-        } else if (ch === "\x03") {
-          return finish(undefined);
-        } else if (ch === "\x7f" || ch === "\b") {
-          cur = cur.slice(0, -1);
-          lastWasCr = false;
-          process.stdout.write("\b \b");
-        } else {
-          cur += ch;
-          process.stdout.write(ch);
-          lastWasCr = false;
-        }
-      }
-    };
-    const onSigint = () => finish(undefined);
-    process.on("SIGINT", onSigint);
-    stdin.on("data", onData);
-    stdin.resume();
-  });
 }
 
 /**
@@ -390,7 +264,7 @@ async function run(ctx: CommandContext): Promise<void> {
     return;
   }
   if (skill === null) {
-    p.log.error(`Nothing to save — pass "<skill.md>", pipe it (cat skill.md | postdiff plugin create --${platform}), or run interactively. e.g. postdiff plugin create --${platform} my-skill "<skill.md>"`);
+    p.log.error(`Nothing to save — pass "<skill.md>" or run interactively. e.g. postdiff plugin create --${platform} my-skill "<skill.md>"`);
     process.exitCode = 1;
     uiOutro("nothing changed.");
     return;

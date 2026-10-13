@@ -66,21 +66,18 @@ async function migrateLegacyFlatFiles(pluginHome: string): Promise<void> {
     } catch {
       continue;
     }
-    try {
-      if (content.trim()) {
-        const entries = splitEntries(content);
-        const items = entries.length > 0 ? entries : [content.trim()];
-        for (let i = 0; i < items.length; i++) {
-          const entry = items[i];
-          const parsed = parseSkillName(entry);
-          let base = (parsed ? sanitizeSkillName(parsed) : "") || `skill-${i + 1}`;
-          base = await uniqueSkillName(join(pluginHome, platform), base);
-          await writeFile(join(pluginHome, platform, `${base}.md`), `${entry.trim()}\n`, "utf8");
-        }
+    if (content.trim()) {
+      const entries = splitEntries(content);
+      const items = entries.length > 0 ? entries : [content.trim()];
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i];
+        const parsed = parseSkillName(entry);
+        let base = (parsed ? sanitizeSkillName(parsed) : "") || `skill-${i + 1}`;
+        base = await uniqueSkillName(join(pluginHome, platform), base);
+        await writeFile(join(pluginHome, platform, `${base}.md`), `${entry.trim()}\n`, "utf8");
       }
-    } finally {
-      await unlink(legacyPath).catch(() => {});
     }
+    await unlink(legacyPath).catch(() => {});
   }
 }
 

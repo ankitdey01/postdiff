@@ -7,6 +7,7 @@ import * as p from "@clack/prompts";
 import { applySetup, pingProviderKey, pingTypesafeKey, loadConfig, PROVIDERS, getProviderSpec, parseSkillName, type Platform, type ProviderSpec } from "@postdiff/core";
 import { resolveKeys } from "../keys.js";
 import { startBigTextLoop } from "../big-text.js";
+import { promptLongText } from "../ui.js";
 import type { CommandContext, PostdiffCommand } from "../router.js";
 
 const TYPESAFE_KEYS_URL = "https://console.typesafe.ai/keys";
@@ -55,16 +56,12 @@ async function promptRequiredKey(
 }
 
 async function promptOptionalMarkdown(label: string, what: string): Promise<string> {
-  // Gated behind a confirm so skipping is one keypress. NOTE: no
-  // `showSubmit` here — that flag disables double-Enter-to-submit and turns
-  // every Enter into a newline with no way out except Tab.
+  // Gated behind a confirm so skipping is one keypress. Paste-safe multiline
+  // (see `promptLongText`): blank lines in the paste must not submit early.
   const add = await p.confirm({ message: `Add ${label}? (optional)`, initialValue: false });
   if (p.isCancel(add)) cancelled();
   if (!add) return "";
-  const value = await p.multiline({
-    message: `Paste ${what} — Enter twice to submit, empty skips`,
-    placeholder: `Your ${what} markdown…`,
-  });
+  const value = await promptLongText(`Paste ${what}`, `Your ${what} markdown…`);
   if (p.isCancel(value)) cancelled();
   return value.trim();
 }

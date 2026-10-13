@@ -18,7 +18,7 @@ import {
 import type { CommandContext, PostdiffCommand } from "../router.js";
 import type { ReferenceFile } from "@postdiff/core";
 import { singleFlag } from "../helpers.js";
-import { uiIntro, uiOutro, isInteractive, showNote } from "../ui.js";
+import { uiIntro, uiOutro, isInteractive, showNote, promptLongText } from "../ui.js";
 
 function referenceDir(): string {
   return join(getPostdiffHome(), "reference");
@@ -52,12 +52,7 @@ async function ensureExample(ctx: CommandContext): Promise<string | null | undef
   const example = ctx.positional.slice(1).join(" ");
   if (example.trim()) return example;
   if (!isInteractive()) return null;
-  // No `showSubmit`: that flag disables double-Enter-to-submit and traps the
-  // user in newline-insertion. Double-Enter submits, empty skips.
-  const pasted = await p.multiline({
-    message: "Paste the real post — Enter twice to submit, empty skips",
-    placeholder: "Your real post…",
-  });
+  const pasted = await promptLongText("Paste the real post", "Your real post…");
   if (p.isCancel(pasted)) return undefined;
   return pasted.trim();
 }

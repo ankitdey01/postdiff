@@ -18,7 +18,7 @@ import {
 import type { CommandContext, PostdiffCommand } from "../router.js";
 import type { PreferenceFile } from "@postdiff/core";
 import { singleFlag } from "../helpers.js";
-import { uiIntro, uiOutro, isInteractive, showNote } from "../ui.js";
+import { uiIntro, uiOutro, isInteractive, showNote, promptLongText } from "../ui.js";
 
 function preferencesDir(): string {
   return join(getPostdiffHome(), "preferences");
@@ -52,12 +52,12 @@ async function ensureRule(ctx: CommandContext): Promise<string | null | undefine
   const rule = ctx.positional.slice(1).join(" ");
   if (rule.trim()) return rule;
   if (!isInteractive()) return null;
-  const typed = await p.text({
-    message: "Type the rule (empty submit skips)",
-    placeholder: "e.g. open with the outcome, not the process…",
-  });
-  if (p.isCancel(typed)) return undefined;
-  return typed.trim();
+  // Multiline (not `p.text`, which submits on the first newline and keeps
+  // only line 1). Pasted line breaks collapse: rules stay single-line like
+  // the distilled ones (`truncateRule` collapses whitespace the same way).
+  const pasted = await promptLongText("Type the rule", "e.g. open with the outcome, not the process…");
+  if (p.isCancel(pasted)) return undefined;
+  return pasted.replace(/\s+/g, " ").trim();
 }
 
 async function run(ctx: CommandContext): Promise<void> {
