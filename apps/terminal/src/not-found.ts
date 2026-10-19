@@ -176,7 +176,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /**
  * Render the 404 for an unknown command. "page" copy is swapped for
  * "command": title `command not found`, message names the bad command.
- * Animates at 15fps for ~3s on a TTY; prints one static frame otherwise.
+ * On a capable TTY the ghost drifts in place (~3s at 15fps), rewriting the
+ * same 21-line block in place via cursor-up + erase (no full-screen clear,
+ * so nothing scrolls or flashes), and the resting frame is left on screen;
+ * otherwise one static frame is printed. Raw stdout only.
  */
 export async function showNotFound(unknown: string, knownCommands: string[]): Promise<void> {
   const clean = unknown.slice(0, 30);
@@ -190,20 +193,28 @@ export async function showNotFound(unknown: string, knownCommands: string[]): Pr
     (hint ? `did you mean \`postdiff ${hint}\`?\n` : "") +
     `available: ${knownCommands.join(", ")}\nrun \`postdiff --help\` for usage.`;
 
-  const tty = Boolean(process.stdout.isTTY);
-  if (!tty) {
-    process.stdout.write(frame(0) + "\n" + footer + "\n");
+  const width = process.stdout.columns ?? NOT_FOUND_COLS;
+  const at = (t: number): string =>
+    frame(t)
+      .split("\n")
+      .map((l) => l.slice(0, width))
+      .join("\n");
+  const resting = at(0);
+  const rows = resting.split("\n").length;
+  if (!process.stdout.isTTY || process.env["TERM"] === "dumb") {
+    process.stdout.write(resting + "\n" + footer + "\n");
     return;
   }
 
   const frames = Math.round(3 * FPS);
   process.stdout.write("\x1b[?25l");
   try {
+    process.stdout.write(resting + "\n");
     for (let i = 0; i < frames; i++) {
-      process.stdout.write("\x1b[2J\x1b[H" + frame(i / FPS));
       await sleep(1000 / FPS);
+      process.stdout.write(`\x1b[${rows}A\x1b[J` + at(i / FPS) + "\n");
     }
-    process.stdout.write("\x1b[2J\x1b[H" + frame(frames / FPS) + "\n");
+    process.stdout.write(`\x1b[${rows}A\x1b[J` + resting + "\n");
   } finally {
     process.stdout.write("\x1b[?25h");
   }
