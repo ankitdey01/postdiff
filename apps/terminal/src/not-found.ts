@@ -14,6 +14,7 @@ export interface NotFoundOptions {
 export const NOT_FOUND_COLS = 60;
 export const NOT_FOUND_ROWS = 21;
 const FPS = 15;
+const ANIMATION_SECONDS = 2;
 
 // A 3x5 font, each font column drawn 4 cells wide and the rows 2,1,2,1,2
 // cells tall, so a digit is 12x8 and strokes are as thick across as down.
@@ -174,12 +175,20 @@ function suggestCommand(unknown: string, known: string[]): string | null {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Cursor animation is only safe when both ends of the terminal are live.
+ * Keeping the stdin check also prevents animation in output-only captures.
+ */
+function supportsNotFoundAnimation(): boolean {
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY && process.env["TERM"] !== "dumb");
+}
+
+/**
  * Render the 404 for an unknown command. "page" copy is swapped for
  * "command": title `command not found`, message names the bad command.
- * On a capable TTY the ghost drifts in place (~3s at 15fps), rewriting the
- * same 21-line block in place via cursor-up + erase (no full-screen clear,
- * so nothing scrolls or flashes), and the resting frame is left on screen;
- * otherwise one static frame is printed. Raw stdout only.
+ * On terminals with cursor control support the ghost drifts in place for
+ * roughly two seconds; all other output gets one static frame so ANSI
+ * control sequences cannot turn animation frames into duplicate output.
+ * Raw stdout only.
  */
 export async function showNotFound(unknown: string, knownCommands: string[]): Promise<void> {
   const clean = unknown.slice(0, 30);
@@ -197,24 +206,38 @@ export async function showNotFound(unknown: string, knownCommands: string[]): Pr
   const at = (t: number): string =>
     frame(t)
       .split("\n")
-      .map((l) => l.slice(0, width))
+      .map((line) => line.slice(0, width))
       .join("\n");
   const resting = at(0);
-  const rows = resting.split("\n").length;
-  if (!process.stdout.isTTY || process.env["TERM"] === "dumb") {
+  if (!supportsNotFoundAnimation()) {
     process.stdout.write(resting + "\n" + footer + "\n");
     return;
   }
 
-  const frames = Math.round(3 * FPS);
+  const rows = resting.split("\n").length;
+  const frames = Math.round(ANIMATION_SECONDS * FPS);
+  let previous = resting.split("\n");
+  const drawChangedLines = (nextFrame: string): void => {
+    const next = nextFrame.split("\n");
+    let update = "\x1b[s";
+    for (let row = 0; row < rows; row++) {
+      if (next[row] === previous[row]) continue;
+      // The cursor is at the line immediately below the frame. Only redraw
+      // changed ghost rows, so the large 404 itself is written once.
+      update += `\x1b[${rows - row}A\x1b[2K\r${next[row]}\x1b[u`;
+    }
+    if (update !== "\x1b[s") process.stdout.write(update);
+    previous = next;
+  };
+
   process.stdout.write("\x1b[?25l");
   try {
     process.stdout.write(resting + "\n");
     for (let i = 0; i < frames; i++) {
       await sleep(1000 / FPS);
-      process.stdout.write(`\x1b[${rows}A\x1b[J` + at(i / FPS) + "\n");
+      drawChangedLines(at(i / FPS));
     }
-    process.stdout.write(`\x1b[${rows}A\x1b[J` + resting + "\n");
+    drawChangedLines(resting);
   } finally {
     process.stdout.write("\x1b[?25h");
   }
