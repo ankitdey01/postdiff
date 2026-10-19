@@ -5,7 +5,7 @@
 // esc-to-close. Import paths adapted to Postdiff (`../ui/utils`).
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "../ui/utils";
 import { EASE_SMOOTH_OUT } from "./ease";
 import { PresenceGate } from "./presence-gate";
@@ -35,9 +35,25 @@ export function Drawer({
   dismissable = true,
 }: DrawerProps) {
   const reduce = useReducedMotion();
+  const panelRef = useRef<HTMLElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const hasPreviousFocusRef = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      if (hasPreviousFocusRef.current) {
+        previousFocusRef.current?.focus();
+        previousFocusRef.current = null;
+        hasPreviousFocusRef.current = false;
+      }
+      return;
+    }
+    if (!hasPreviousFocusRef.current) {
+      previousFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      hasPreviousFocusRef.current = true;
+    }
+    panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onOpenChange(false);
     };
@@ -79,9 +95,11 @@ export function Drawer({
         <PresenceGate key="panel">
           {({ gate }) => (
             <motion.aside
+              ref={panelRef}
               role="dialog"
               aria-modal="true"
               aria-label={ariaLabel}
+              tabIndex={-1}
               initial={reduce ? { opacity: 0 } : { x: offscreen }}
               animate={reduce ? { opacity: 1 } : { x: 0 }}
               exit={

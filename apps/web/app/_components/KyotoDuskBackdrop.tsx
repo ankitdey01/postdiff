@@ -13,7 +13,7 @@ import { kyotoDusk } from "ascii.rest/pieces";
  * (41) as the original piece so its shading still works.
  */
 const LIME_PALETTE = [
-  "#1c1d4a", "#262759", "#33316b", "#433d7c", "#574a8c", "#6e5a9a",
+  "#111807", "#182108", "#202b0a", "#2a350d", "#354310", "#415114",
   "#7fae0e", "#97dc21", "#a6d609", "#bdea0c", "#c8f902", "#ddfb6e", "#f0ffc4",
   "#fff1d8", "#fffaf0", "#d7f26a",
   "#f4ffd6", "#ddfb6e", "#c8f902", "#a6d609", "#82d305", "#6b9412",

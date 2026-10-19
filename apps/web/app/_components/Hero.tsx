@@ -73,7 +73,7 @@ export function Hero() {
           Start for free
         </ScrollCta>
         <ScrollButton
-          to="faq"
+          to="how"
           className="btn-ghost hero-cta group flex w-full shrink-0 cursor-pointer items-center justify-center gap-2 py-3.5 pe-4 ps-4 font-sans text-base shadow-none sm:w-[200px]"
         >
           See how it works <ChevronDown size={16} strokeWidth={2} absoluteStrokeWidth aria-hidden="true" className="hero-cta-icon hero-cta-icon-y" />

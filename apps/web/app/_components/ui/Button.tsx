@@ -6,7 +6,7 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "./utils";
 
 export const buttonVariants = cva(
@@ -46,6 +46,7 @@ export function Button({
     props: mergeProps<"button">({
       className: cn(buttonVariants({ variant, size, className })),
       "aria-disabled": loading || undefined,
+      "data-loading": loading ? "" : undefined,
       disabled: Boolean(loading || disabled),
       type: render ? undefined : "button",
       children: <>
@@ -53,6 +54,6 @@ export function Button({
         {children}
         {loading && <Loader2 aria-label="Loading" role="status" className="absolute animate-spin text-foreground motion-reduce:animate-none" />}
       </>,
-    }, props),
+    } as ComponentProps<"button"> & { "data-loading"?: string }, props),
   });
 }

@@ -77,6 +77,7 @@ export function Features() {
                 <PixelCard
                   theme="dark"
                   variant="default"
+                  noFocus
                   radius={0}
                   trigger="hover"
                   glow={0.2}

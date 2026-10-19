@@ -93,6 +93,7 @@ export function CodeWindow() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const refocusRef = useRef(false);
   const playedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -216,7 +217,7 @@ export function CodeWindow() {
       }
       push("dim", "loading context…");
       await sleep(reducedRef.current ? 0 : 550);
-      push("body", "context ready, drafting… (x)");
+      push("body", `context ready, drafting… (${platform})`);
       await sleep(reducedRef.current ? 0 : 450);
       push("jev", "worth sharing (6 of 9 files kept)");
       await sleep(reducedRef.current ? 0 : 350);
@@ -292,12 +293,19 @@ export function CodeWindow() {
         }
       } finally {
         busyRef.current = false;
+        refocusRef.current = true;
         setBusy(false);
-        inputRef.current?.focus({ preventScroll: true });
       }
     },
     [runContext, runGenerate, runHelp, runPublish, runReview, push, typeCommand],
   );
+
+  useEffect(() => {
+    if (!busy && refocusRef.current) {
+      refocusRef.current = false;
+      inputRef.current?.focus({ preventScroll: true });
+    }
+  }, [busy]);
 
   // Autoplay once in view: a single short demo (check, draft, next step).
   // Reduced-motion users get instant output. Full context output
@@ -307,15 +315,18 @@ export function CodeWindow() {
     if (!el || playedRef.current) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (!entries[0].isIntersecting || playedRef.current) return;
+        if (!entries[0].isIntersecting || playedRef.current || busyRef.current) return;
         playedRef.current = true;
         io.disconnect();
         (async () => {
           busyRef.current = true;
           setBusy(true);
-          await runGenerate("x", true);
-          busyRef.current = false;
-          setBusy(false);
+          try {
+            await runGenerate("x", true);
+          } finally {
+            busyRef.current = false;
+            setBusy(false);
+          }
         })();
       },
       { threshold: 0.35 },
