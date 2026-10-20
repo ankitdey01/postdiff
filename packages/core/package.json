@@ -1,6 +1,6 @@
 {
   "name": "@postdiff/core",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "description": "Postdiff engine — UI-agnostic. No commander/clack/clipboardy here; secrets passed in, never read.",
   "type": "module",
   "main": "./dist/index.js",
