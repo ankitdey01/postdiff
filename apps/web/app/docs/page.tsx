@@ -24,7 +24,7 @@ const WORKFLOW = [
   },
   {
     index: "02",
-    title: "Generate from a commit",
+    title: "Generate from a commit.",
     body: "Run the command from a repository. Postdiff checks whether the change is worth sharing before it writes anything.",
   },
   {
