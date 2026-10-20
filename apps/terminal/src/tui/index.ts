@@ -4,5 +4,5 @@
 export const TUI_STATUS = "stub" as const;
 
 export async function runTui(): Promise<void> {
-  throw new Error("TUI not implemented yet — showing help instead.");
+  throw new Error("TUI not implemented yet, showing help instead.");
 }
