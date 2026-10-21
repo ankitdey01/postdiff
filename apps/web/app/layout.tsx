@@ -24,14 +24,37 @@ const movatifLight = localFont({
 const SITE_TITLE = "Postdiff: turn finished work into posts that sound like you";
 const SITE_DESCRIPTION =
   "Postdiff picks the work worth sharing and drafts the post in your voice. You approve every word.";
+const SITE_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_ORIGIN),
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
+  icons: {
+    icon: [
+      { url: "/logo.webp", type: "image/webp" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    apple: "/logo.webp",
+  },
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     type: "website",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Postdiff — turn finished work into posts that sound like you",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/opengraph-image"],
   },
 };
 

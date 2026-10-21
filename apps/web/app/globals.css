@@ -301,6 +301,24 @@ details[open] .faq-marker {
   }
 }
 
+/* Keep the primary mobile CTA copy optically centred while its dotted
+   accent stays anchored on the left edge. */
+@media (max-width: 639px) {
+  .hero-start-cta > span.z-10 {
+    width: 36px !important;
+  }
+  .hero-start-cta[data-active="true"] > span.z-10 {
+    width: calc(100% - 12px) !important;
+  }
+  .hero-start-cta > span.relative.z-0 {
+    position: absolute;
+    left: 50%;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    transform: translateX(-50%) !important;
+  }
+}
+
 /* Nav dot-matrix: opacity feedback, hover-capable pointers only. */
 .nav-dot {
   transition: opacity var(--duration-fast) var(--ease-smooth-out);

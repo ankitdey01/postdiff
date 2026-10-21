@@ -145,7 +145,7 @@ export function Finale() {
                 </span>
               </span>
             </ExpandingArrowButton>
-            <CopyCommand command={INSTALL_CMD} />
+             <CopyCommand command={INSTALL_CMD} className="w-full sm:w-auto" />
           </Reveal>
         </div>
         <div className="hairline" />

@@ -104,6 +104,7 @@ export const ExpandingArrowButton = forwardRef<
       onMouseLeave={handleMouseLeave}
       onFocus={handleFocus}
       onBlur={handleBlur}
+      data-active={active ? "true" : "false"}
       whileTap={reduce || disabled ? undefined : { scale: 0.97 }}
       transition={SPRING_PRESS}
       className={cn(

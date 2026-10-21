@@ -1,6 +1,8 @@
 <div align="center">
 
-# 📮 Postdiff
+<img src="apps/web/public/logo.webp" alt="Postdiff Logo" width="120" height="120" />
+
+# Postdiff
 
 **Turn commits into posts that sound like you wrote them.**
 

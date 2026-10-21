@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { MobileMenu } from "./MobileMenu";
 import { ScrollCta } from "./ScrollCta";
 
@@ -18,10 +19,14 @@ export function Nav() {
       </div>
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-10">
         <Link href="/" className="flex items-center gap-3" aria-label="Postdiff home">
-          <span className="flex h-7 w-7 items-center justify-center bg-white font-mono text-lg font-bold text-black">
-            ›_
-          </span>
-          <span className="eyebrow hidden text-white sm:inline">Postdiff</span>
+          <Image 
+            src="/logo.webp" 
+            alt="Postdiff Logo" 
+            width={28} 
+            height={28}
+            className="h-8 w-8 sm:h-9 sm:w-9"
+          />
+          <span className="eyebrow text-[15px] text-white sm:text-base">Postdiff</span>
         </Link>
         <nav className="hidden items-center gap-6 md:flex" aria-label="Primary">
           {LINKS.map((l) => (
