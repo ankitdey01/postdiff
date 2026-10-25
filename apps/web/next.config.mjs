@@ -1,8 +1,11 @@
-import { fileURLToPath } from 'node:url';
+import {
+    fileURLToPath
+} from 'node:url';
 
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV !== 'production';
-const monorepoRoot = fileURLToPath(new URL('../..', import.meta.url));
+const monorepoRoot = fileURLToPath(new URL('../..',
+    import.meta.url));
 
 // CSP: allow 'unsafe-eval' in dev for React hot reloading and debugging
 const scriptSrc = isDev ?
