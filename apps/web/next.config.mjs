@@ -11,7 +11,7 @@ const scriptSrc = isDev ?
 
 const securityHeaders = [{
         key: 'Content-Security-Policy',
-        value: `default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:`
+        value: `default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' https://api.producthunt.com data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:`
     },
     {
         key: 'Permissions-Policy',
