@@ -8,7 +8,8 @@
         "dev": "next dev",
         "build": "next build",
         "start": "next start",
-        "typecheck": "tsc --noEmit -p tsconfig.json"
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "test:agent": "node scripts/test-agent-readiness.mjs"
     },
     "dependencies": {
         "@base-ui/react": "^1.9.0",

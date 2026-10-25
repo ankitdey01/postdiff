@@ -1,0 +1,176 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Postdiff Public API",
+    "version": "1.0.0",
+    "description": "A small, read-only discovery API for Postdiff, the local-first Git commit-to-post generator. The public API does not access repositories, user drafts, provider keys, or platform accounts."
+  },
+  "servers": [
+    {
+      "url": "https://postdiff.vercel.app",
+      "description": "Postdiff production web service"
+    }
+  ],
+  "externalDocs": {
+    "description": "Postdiff documentation",
+    "url": "https://postdiff.vercel.app/docs"
+  },
+  "tags": [
+    {
+      "name": "Discovery",
+      "description": "Machine-readable product and capability discovery."
+    }
+  ],
+  "paths": {
+    "/api/v1": {
+      "get": {
+        "operationId": "getProduct",
+        "summary": "Get Postdiff product information",
+        "description": "Returns the product identity, workflow, install command, and safety principles.",
+        "tags": ["Discovery"],
+        "responses": {
+          "200": {
+            "description": "Product information",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Product" }
+              }
+            }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Check service health",
+        "description": "Returns a no-auth health response for monitoring and agent discovery.",
+        "tags": ["Discovery"],
+        "responses": {
+          "200": {
+            "description": "Service is available",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Health" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/product": {
+      "get": {
+        "operationId": "getProductDetails",
+        "summary": "Get detailed product information",
+        "description": "Returns the same stable product discovery object as the API root.",
+        "tags": ["Discovery"],
+        "responses": {
+          "200": {
+            "description": "Product information",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Product" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "operationId": "listCapabilities",
+        "summary": "List supported Postdiff capabilities",
+        "description": "Returns supported post formats, CLI commands, generation behavior, and publishing constraints.",
+        "tags": ["Discovery"],
+        "responses": {
+          "200": {
+            "description": "Capability catalog",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Capabilities" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Product": {
+        "type": "object",
+        "required": ["name", "description", "productType", "website", "repository", "install", "workflow", "principles"],
+        "properties": {
+          "name": { "type": "string", "description": "Product name", "examples": ["Postdiff"] },
+          "description": { "type": "string" },
+          "productType": { "type": "string" },
+          "website": { "type": "string", "format": "uri" },
+          "repository": { "type": "string", "format": "uri" },
+          "install": { "type": "string" },
+          "workflow": { "type": "array", "items": { "type": "string" } },
+          "principles": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "Capabilities": {
+        "type": "object",
+        "required": ["formats", "commands", "generation", "publishing"],
+        "properties": {
+          "formats": { "type": "array", "items": { "type": "string", "enum": ["x", "linkedin", "blog"] } },
+          "commands": { "type": "array", "items": { "type": "string" } },
+          "generation": {
+            "type": "object",
+            "required": ["significanceFilter", "providers", "webSearch"],
+            "properties": {
+              "significanceFilter": { "type": "string" },
+              "providers": { "type": "integer", "minimum": 0 },
+              "webSearch": { "type": "string" }
+            }
+          },
+          "publishing": {
+            "type": "object",
+            "required": ["mode", "autonomousPublishing"],
+            "properties": {
+              "mode": { "type": "string" },
+              "autonomousPublishing": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": ["status", "service", "version"],
+        "properties": {
+          "status": { "type": "string", "enum": ["ok"] },
+          "service": { "type": "string" },
+          "version": { "type": "string" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "hint"],
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "hint": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "MethodNotAllowed": {
+        "description": "The endpoint does not accept this HTTP method.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    }
+  }
+}

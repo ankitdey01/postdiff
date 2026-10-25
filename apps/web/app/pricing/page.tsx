@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: "Pricing: free while it runs on your keys",
   description:
     "Postdiff is free to use. You only pay whatever your AI provider charges, usually a few cents per draft.",
+  alternates: { canonical: "/pricing" },
 };
 
 const INCLUDED = [

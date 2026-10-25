@@ -11,9 +11,10 @@ import { TaskList } from "../_components/ui/task-list";
 import BlurText from "../_components/ui/BlurText";
 
 export const metadata: Metadata = {
-  title: "Docs: from finished work to a first draft",
+  title: "Postdiff docs: from finished work to a first draft",
   description:
     "Install Postdiff, configure your voice, and turn meaningful git changes into drafts you can review before sharing.",
+  alternates: { canonical: "/docs" },
 };
 
 const WORKFLOW = [
@@ -107,6 +108,22 @@ export default function DocsPage() {
                   >
                     Browse commands
                   </Link>
+                </Reveal>
+                <Reveal delay={350} className="mt-8 border-t border-line pt-5">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/35">
+                    Agent resources
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 font-mono text-xs text-white/55">
+                    <a className="underline decoration-white/20 underline-offset-4 hover:text-white" href="/openapi.json">
+                      OpenAPI
+                    </a>
+                    <a className="underline decoration-white/20 underline-offset-4 hover:text-white" href="/llms.txt">
+                      llms.txt
+                    </a>
+                    <a className="underline decoration-white/20 underline-offset-4 hover:text-white" href="/.well-known/mcp">
+                      MCP manifest
+                    </a>
+                  </div>
                 </Reveal>
               </div>
 

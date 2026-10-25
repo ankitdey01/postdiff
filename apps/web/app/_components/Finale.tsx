@@ -180,49 +180,66 @@ export function Finale() {
                 You approve every word
               </p>
             </div>
-            <nav
-              className="grid shrink-0 grid-cols-2 gap-12 sm:grid-cols-3 sm:gap-16 lg:w-[430px] lg:gap-24"
-              aria-label="Footer"
-            >
-              <div className="flex flex-col gap-3">
-                <p className="font-mono text-[11px] uppercase tracking-widest text-white/30">
-                  Product
-                </p>
-                {PRODUCT_LINKS.map((l) => (
-                  <PageLink key={l.label} href={l.href}>
-                    {l.label.toUpperCase()}
-                  </PageLink>
-                ))}
-                {RESOURCE_LINKS.map((l) => (
-                  <PageLink key={l.label} href={l.href}>
-                    {l.label.toUpperCase()}
-                  </PageLink>
-                ))}
-              </div>
-              <div className="flex flex-col gap-3">
-                <p className="font-mono text-[11px] uppercase tracking-widest text-white/30">
-                  Legal
-                </p>
-                {LEGAL_LINKS.map((l) => (
-                  <PageLink key={l.label} href={l.href}>
-                    {l.label.toUpperCase()}
-                  </PageLink>
-                ))}
-              </div>
-              <div className="flex flex-col gap-3">
-                <p className="font-mono text-[11px] uppercase tracking-widest text-white/30">
-                  Elsewhere
-                </p>
-                <StripLink href="https://github.com/ankitdey01/postdiff">
-                  <span className="inline-flex items-center gap-1">
-                    GITHUB <ArrowUpRight size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />
+            <div className="flex shrink-0 flex-col gap-8 lg:w-[430px]">
+              <nav
+                className="grid grid-cols-2 gap-12 sm:grid-cols-3 sm:gap-16 lg:gap-24"
+                aria-label="Footer"
+              >
+                <div className="flex flex-col gap-3">
+                  <p className="font-mono text-[11px] uppercase tracking-widest text-white/30">
+                    Product
+                  </p>
+                  {PRODUCT_LINKS.map((l) => (
+                    <PageLink key={l.label} href={l.href}>
+                      {l.label.toUpperCase()}
+                    </PageLink>
+                  ))}
+                  {RESOURCE_LINKS.map((l) => (
+                    <PageLink key={l.label} href={l.href}>
+                      {l.label.toUpperCase()}
+                    </PageLink>
+                  ))}
+                </div>
+                <div className="flex flex-col gap-3">
+                  <p className="font-mono text-[11px] uppercase tracking-widest text-white/30">
+                    Legal
+                  </p>
+                  {LEGAL_LINKS.map((l) => (
+                    <PageLink key={l.label} href={l.href}>
+                      {l.label.toUpperCase()}
+                    </PageLink>
+                  ))}
+                </div>
+                <div className="flex flex-col gap-3">
+                  <p className="font-mono text-[11px] uppercase tracking-widest text-white/30">
+                    Elsewhere
+                  </p>
+                  <StripLink href="https://github.com/ankitdey01/postdiff">
+                    <span className="inline-flex items-center gap-1">
+                      GITHUB <ArrowUpRight size={12} strokeWidth={1.5} absoluteStrokeWidth aria-hidden="true" />
+                    </span>
+                  </StripLink>
+                  <span className="text-[12px] tracking-[-2%] text-white/30 md:text-[14px]">
+                    Version 0.0.1
                   </span>
-                </StripLink>
-                <span className="text-[12px] tracking-[-2%] text-white/30 md:text-[14px]">
-                  Version 0.0.1
-                </span>
-              </div>
-            </nav>
+                </div>
+              </nav>
+              <a
+                href="https://www.producthunt.com/products/postdiff?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-postdiff"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Postdiff on Product Hunt — featured product"
+                className="block w-full"
+              >
+                <img
+                  alt="Postdiff - turn finished work into posts that sound like you"
+                  width="250"
+                  height="54"
+                  className="max-w-full"
+                  src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1292564&theme=dark&t=1792955710546"
+                />
+              </a>
+            </div>
           </div>
           {/* Bottom info strip. */}
           <div className="border-y border-line bg-black/40 backdrop-blur-md">

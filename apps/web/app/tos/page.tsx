@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "Terms: simple ground rules",
   description:
     "Simple terms for Postdiff. The tool is provided as is, you own your drafts, and you are responsible for what you post.",
+  alternates: { canonical: "/tos" },
 };
 
 const SECTIONS = [

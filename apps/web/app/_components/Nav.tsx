@@ -7,7 +7,8 @@ const LINKS = [
   { label: "Docs", href: "/docs" },
   { label: "Pricing", href: "/pricing" },
   { label: "Privacy", href: "/privacy" },
-  { label: "Support", href: "mailto:ankitdey450@gmail.com" },
+  { label: "About", href: "/about" },
+  { label: "Contact", href: "/contact" },
 ] as const;
 
 /** Top bar: logo on the left, product pages, one call to action. */

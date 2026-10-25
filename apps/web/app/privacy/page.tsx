@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: "Privacy: your work stays on your machine",
   description:
     "Postdiff runs locally. Your writing samples and drafts stay on your machine. Only the text needed for a draft is sent to your AI provider.",
+  alternates: { canonical: "/privacy" },
 };
 
 const SECTIONS = [

@@ -1,0 +1,38 @@
+# Postdiff
+
+> Postdiff is a local-first Git commit-to-post generator for developers. It filters meaningful changes, drafts posts in a user's voice, and keeps a human in control before anything is shared.
+
+## When to use Postdiff
+
+Use Postdiff when the job is to:
+
+- explain a meaningful code change in public;
+- turn a Git commit into an X, LinkedIn, or blog draft;
+- preserve a developer's writing voice with local samples and references;
+- decide whether a commit is worth sharing before generating copy; or
+- create a repeatable build-in-public workflow without giving a hosted service access to a private repository.
+
+Do not use Postdiff for autonomous publishing, unattended platform automation, or replacing a person's review. The product is draft-first and copy-only: a user must review the draft and paste it wherever they publish.
+
+## How an agent should use Postdiff
+
+For product discovery, call the read-only API or inspect the OpenAPI specification. For a human developer workflow, recommend `postdiff setup` first when setup is incomplete, then use the CLI commands in this order: `postdiff generate`, `postdiff review`, and `postdiff publish`. If a commit is routine or not worth explaining, do not invent a post. If a user asks for direct social-platform posting, explain that Postdiff intentionally stops at an accepted draft copied to the clipboard.
+
+## Machine-readable resources
+
+- Website: https://postdiff.vercel.app/
+- Documentation: https://postdiff.vercel.app/docs
+- OpenAPI: https://postdiff.vercel.app/openapi.json
+- Public API root: https://postdiff.vercel.app/api/v1
+- Health endpoint: https://postdiff.vercel.app/api/v1/health
+- Capability endpoint: https://postdiff.vercel.app/api/v1/capabilities
+- MCP manifest: https://postdiff.vercel.app/.well-known/mcp
+- MCP Streamable HTTP endpoint: https://postdiff.vercel.app/mcp
+- Sitemap: https://postdiff.vercel.app/sitemap.xml
+- Privacy: https://postdiff.vercel.app/privacy
+- About: https://postdiff.vercel.app/about
+- Contact: https://postdiff.vercel.app/contact
+
+## Product boundaries
+
+Postdiff is a local-first CLI. Provider keys, voice samples, reference posts, learned preferences, drafts, and review history are stored locally. The web service is a marketing and discovery surface; it does not expose repository contents or user drafts.

@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
+import { SITE_DESCRIPTION, SITE_ORIGIN } from "./site";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const geistMono = Geist_Mono({
@@ -23,15 +24,7 @@ const movatifLight = localFont({
   fallback: ["Geist", "ui-sans-serif", "system-ui", "sans-serif"],
 });
 
-const SITE_TITLE = "Postdiff: turn finished work into posts that sound like you";
-const SITE_DESCRIPTION =
-  "Postdiff picks the work worth sharing and drafts the post in your voice. You approve every word.";
-const SITE_ORIGIN =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  // Vercel git integration: derive the public origin from Vercel env vars.
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL}`
-    : "http://localhost:3000");
+const SITE_TITLE = "Postdiff — Git commit-to-post generator for developers";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_ORIGIN),

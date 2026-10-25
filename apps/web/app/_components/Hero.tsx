@@ -28,7 +28,9 @@ export function Hero() {
           {/* TechText centers its ink inside a fixed canvas, so offset the
               canvas slack rather than leaving a false gap before the copy. */}
           <Reveal delay={0} className="w-full sm:-mb-12">
-            <h1 className="sr-only">Turn commits into posts that sound like you wrote them</h1>
+            <h1 className="sr-only">
+              Postdiff — the Git commit-to-post generator that sounds like you wrote it
+            </h1>
             <div aria-hidden="true" className="w-full max-w-[720px] -translate-x-1.5 sm:translate-x-0">
               <div className="h-[176px] w-full sm:h-[288px] lg:h-[348px]">
                 <TechText
