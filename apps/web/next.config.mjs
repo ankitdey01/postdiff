@@ -44,6 +44,9 @@ if (!isDev) {
 const nextConfig = {
     allowedDevOrigins: ['192.168.29.178'],
     poweredByHeader: false,
+    experimental: {
+        agentUpgrade: 'security',
+    },
     turbopack: {
         // Point to monorepo root so Turbopack can find node_modules
         root: monorepoRoot,

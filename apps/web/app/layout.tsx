@@ -24,7 +24,7 @@ const movatifLight = localFont({
   fallback: ["Geist", "ui-sans-serif", "system-ui", "sans-serif"],
 });
 
-const SITE_TITLE = "Postdiff — Git commit-to-post generator for developers";
+const SITE_TITLE = "Postdiff | Git commit-to-post generator for developers";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_ORIGIN),

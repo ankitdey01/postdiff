@@ -1,4 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
+import Image from "next/image";
 import { Reveal } from "./Reveal";
 import { SectionBand } from "./SectionBand";
 import BlurText from "./ui/BlurText";
@@ -87,8 +88,14 @@ export function Stories() {
                   <span className="font-mono text-xs text-ink" aria-hidden="true"><ArrowUpRight size={12} strokeWidth={2} absoluteStrokeWidth /></span>
                 </div>
                 <figcaption className="mt-10 flex items-center gap-3.5">
-                  <span className="flex h-14 w-14 items-center justify-center bg-white font-mono text-xl font-bold text-black" aria-hidden="true">
-                    ›_
+                  <span className="flex h-14 w-14 items-center justify-center" aria-hidden="true">
+                    <Image 
+                      src="/logo.webp" 
+                      alt="" 
+                      width={56} 
+                      height={56}
+                      className="h-full w-full object-contain"
+                    />
                   </span>
                   <span>
                     <span className="block font-sans text-sm font-medium leading-[17px] text-white">

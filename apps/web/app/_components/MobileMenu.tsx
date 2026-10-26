@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowUpRight, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Drawer } from "./motion/drawer";
@@ -40,8 +41,14 @@ export function MobileMenu({ links }: { links: readonly MobileMenuLink[] }) {
       >
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <span className="flex items-center gap-3">
-            <span className="flex h-7 w-7 items-center justify-center bg-white font-mono text-lg font-bold text-black">
-              ›_
+            <span className="flex h-7 w-7 items-center justify-center">
+              <Image 
+                src="/logo.webp" 
+                alt="" 
+                width={28} 
+                height={28}
+                className="h-full w-full object-contain"
+              />
             </span>
             <span className="eyebrow text-white">Postdiff</span>
           </span>
